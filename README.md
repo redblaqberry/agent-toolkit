@@ -2,7 +2,7 @@
 
 **Compile technical discovery transcripts into reviewed, executable deployment contracts.** Agent deployments rarely fail on model quality first; they fail on requirements nobody wrote down, stakeholder statements that contradict each other, and questions nobody answered before go-live. DiscoverySpec addresses that with a versioned `deployment-contract.v1` document (KPIs, roles, allowed actions, escalation rules, security constraints, latency and cost ceilings) in which every field traces back to a numbered customer statement, plus an acceptance suite that runs through [agent-eval-gate](https://github.com/redblaqberry/agent-eval-gate).
 
-What ships today is the foundation of that pipeline: the contract format, a complete example discovery call, and a fail-closed validator. The LLM extraction (`compile`) and gate execution (`run`) stages are on the roadmap below and build on the same contract.
+What ships today: the contract format, a complete example discovery call, a fail-closed validator, and the scenario compiler that exports the ten-scenario acceptance suite in agent-eval-gate's native format. The LLM extraction (`compile`) and gate execution (`run`) stages are on the roadmap below and build on the same contract.
 
 Most eval tooling starts from datasets, tasks, and scorers the user authors. DiscoverySpec starts one step earlier: it preserves provenance from customer statement to requirement to acceptance test, flags contradictory stakeholder requirements before anything runs, and refuses to let a contract with unresolved conflicts or unanswered blocking questions reach execution.
 
@@ -64,15 +64,23 @@ Exit codes are fail closed:
 
 For CI and deploy gates, `--require-approved` makes exit 0 possible only for an approved, clean contract, so a draft can never pass a pipeline.
 
+Once a contract is approved, compile its acceptance suite:
+
+```bash
+discoveryspec export-gate --contract examples/invoice_automation/approved-contract.json --out gate-export
+```
+
+This writes `scenarios.yaml` (ten Given/When/Then scenarios in agent-eval-gate's native format, provenance carried in tags like `REQ-005` and `T15`) and `gate-config.json` (SLOs plus the scenario-to-requirement map). Drafts are refused: no unreviewed contract can run.
+
 ## The bundled example
 
 `examples/invoice_automation/` contains a complete fictional discovery call for supplier-invoice automation at a furniture retailer: a 41-turn transcript with three seeded stakeholder conflicts (autonomous posting vs named human approval on every write, an approver threshold of EUR 5000 vs EUR 500, best-model-regardless vs a EUR 0.08 per-invoice ceiling) and one blocking data-governance question that nobody in the room could answer. Two golden contracts show both ends of the pipeline: the draft as a correct extraction would produce it, and the approved contract after human resolution, including a recorded post-call answer from Legal and an amendment reconciling the touchless KPI with the mandatory approval rule.
 
 ## Status and roadmap
 
-Implemented: transcript parser (numbered turns, strict format, SHA-256 capture), `deployment-contract.v1` JSON Schema plus mirrored Pydantic models, the fail-closed validator, the `validate` CLI, golden contracts, and a 69-test suite.
+Implemented: transcript parser (numbered turns, strict format, SHA-256 capture), `deployment-contract.v1` JSON Schema plus mirrored Pydantic models, the fail-closed validator, the `validate` CLI, the `export-gate` scenario compiler (ten Given/When/Then acceptance scenarios, each linked to transcript turn ids and requirement ids), golden contracts, and an 84-test suite that includes loading the export with agent-eval-gate's own scenario loader.
 
-Roadmap: `compile` (structured LLM extraction of the draft contract, followed by mandatory human approval; no unreviewed contract can run), `approve`, `export-gate`, and `run`, which executes ten Given/When/Then acceptance scenarios through agent-eval-gate, each linked to transcript turn ids and requirement ids. The roadmap is done when 10/10 runnable scenarios retain requirement and transcript provenance and all three seeded conflicts are surfaced before execution; the validator half of that bar is enforced by tests today.
+Roadmap: `compile` (structured LLM extraction of the draft contract, followed by mandatory human approval; no unreviewed contract can run), `approve`, and `run`, which executes the exported scenarios through agent-eval-gate and links every verdict back to the originating customer statement. The roadmap is done when 10/10 runnable scenarios retain requirement and transcript provenance and all three seeded conflicts are surfaced before execution; the compiler and validator halves of that bar are enforced by tests today.
 
 ## Non-goals
 
