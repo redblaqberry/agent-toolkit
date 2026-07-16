@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "discoveryspec"
+version = "0.1.0"
+description = "Compiles a technical discovery transcript into a reviewed, versioned deployment contract with an executable acceptance suite"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Mateusz Śliwiński" }]
+keywords = ["discovery", "requirements", "deployment-contract", "agents", "evaluation", "provenance"]
+dependencies = [
+    "pydantic>=2.5",
+    "typer>=0.12",
+    "jsonschema>=4.21",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+discoveryspec = "discoveryspec.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/discoveryspec"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
