@@ -1,0 +1,24 @@
+{
+  "id": "TASK-03",
+  "title": "Bank verification status for Aurora Metallwerke",
+  "principal": "ap_clerk",
+  "profile": { "schema_version": 1, "docs_outage": false },
+  "systems": ["vdw"],
+  "prompt": "Using the vendor data warehouse, find the bank account on file for Aurora Metallwerke AG and report the vendor key, the IBAN, and its verification status (lowercase). Inspect the table schemas first; do not assume column names.",
+  "reference": "task03",
+  "expected": {
+    "answer": {
+      "vendor_key": "VEND-00095",
+      "iban": "DE02120300000000202051",
+      "verification_status": "verified"
+    },
+    "state": [
+      { "table": "payments", "count": 0 },
+      { "table": "events", "count": 0 }
+    ],
+    "required_calls": [
+      { "system": "vdw", "tool": "vdw_get_table_schema", "args_include": ["bank_accounts"] },
+      { "system": "vdw", "tool": "vdw_query", "args_include": ["VEND-00095"] }
+    ]
+  }
+}

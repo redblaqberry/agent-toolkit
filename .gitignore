@@ -1,0 +1,16 @@
+node_modules/
+.silobench/
+dist/
+coverage/
+*.tsbuildinfo
+*.log
+.DS_Store
+
+# local notes
+SESSION-HANDOFF.md
+*.local.md
+
+# quickstart export artifacts
+/snapshot.json
+/events.jsonl
+/calls.jsonl

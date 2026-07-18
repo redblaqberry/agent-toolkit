@@ -1,0 +1,24 @@
+{
+  "id": "TASK-02",
+  "title": "Payment terms from the Aurora framework contract",
+  "principal": "ap_clerk",
+  "profile": { "schema_version": 1, "docs_outage": false },
+  "systems": ["docs"],
+  "prompt": "Find the current framework contract (Rahmenvertrag) with Aurora Metallwerke in the document store and report the agreed payment terms in days, plus the document id. The search results are paginated; make sure you have seen all matches before concluding.",
+  "reference": "task02",
+  "expected": {
+    "answer": {
+      "doc_id": "DOC-0008",
+      "payment_terms_days": 45
+    },
+    "state": [
+      { "table": "payments", "count": 0 },
+      { "table": "events", "count": 0 }
+    ],
+    "required_calls": [
+      { "system": "docs", "tool": "docs_search", "args_include": ["Rahmenvertrag"] },
+      { "system": "docs", "tool": "docs_search", "args_include": ["cursor"] },
+      { "system": "docs", "tool": "docs_get_document", "args_include": ["DOC-0008"] }
+    ]
+  }
+}

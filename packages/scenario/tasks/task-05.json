@@ -1,0 +1,29 @@
+{
+  "id": "TASK-05",
+  "title": "Vendor identity reconciliation across three silos",
+  "principal": "ap_clerk",
+  "profile": { "schema_version": 1, "docs_outage": false },
+  "systems": ["erp", "docs", "vdw"],
+  "prompt": "The warehouse vendor record for Nordquell and the ERP vendor V-1042 look like they might be the same company, but their identifiers do not line up. Establish whether warehouse vendor VEND-00087, an ERP vendor, and the Nordquell framework contract in the document store all refer to the same legal entity. Report the current ERP vendor id, the warehouse vendor key, the contract document id, and explain what the warehouse's erp_ref actually points to.",
+  "reference": "task05",
+  "expected": {
+    "answer": {
+      "erp_vendor_id": "V-1042",
+      "dw_vendor_key": "VEND-00087",
+      "contract_doc_id": "DOC-0014",
+      "stale_crosswalk_ref": "V-0899",
+      "same_entity": true
+    },
+    "state": [
+      { "table": "payments", "count": 0 },
+      { "table": "events", "count": 0 }
+    ],
+    "required_calls": [
+      { "system": "erp", "tool": "erp_get_vendor", "args_include": ["V-1042"] },
+      { "system": "erp", "tool": "erp_get_vendor", "args_include": ["V-0899"] },
+      { "system": "vdw", "tool": "vdw_query", "args_include": ["VEND-00087"] },
+      { "system": "vdw", "tool": "vdw_query", "args_include": ["bank_accounts", "VEND-00087"] },
+      { "system": "docs", "tool": "docs_get_document", "args_include": ["DOC-0014"] }
+    ]
+  }
+}

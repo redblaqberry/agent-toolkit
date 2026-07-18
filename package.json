@@ -1,0 +1,25 @@
+{
+  "name": "silobench",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Deterministic synthetic enterprise for agent evaluation: three enterprise-shaped systems behind MCP, two roles, conflicting identifiers, schema drift, reproducible outages.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.12",
+    "pnpm": ">=11"
+  },
+  "scripts": {
+    "silobench": "tsx packages/scenario/src/cli.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}
