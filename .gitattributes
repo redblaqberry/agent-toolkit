@@ -1,0 +1,3 @@
+# Vendored producer artifacts and fixtures are content-hashed and compared
+# byte for byte; no line ending conversion may ever touch them.
+fixtures/** -text

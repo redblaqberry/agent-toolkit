@@ -1,0 +1,65 @@
+{
+  "format": "blast-radius.v1",
+  "baseline": {
+    "contracts": ["fixtures/silobench/v1/erp.contract.json"],
+    "fingerprint": "9403e19c00a01d9ed90b7f6856c676ea0e8e67111d31a3adad32a234d00c2496"
+  },
+  "candidate": {
+    "contracts": ["fixtures/silobench/v2/erp.contract.json"],
+    "fingerprint": "81c64e22fb13db3bc5014882ae31f9a12fb1e1352500b900692b75c9cd2661c3"
+  },
+  "change_groups": [
+    {
+      "id": "CHG-001",
+      "rule": "scope-changed",
+      "severity": "breaking",
+      "server": "erp",
+      "tool": "erp_release_payment",
+      "findings": [
+        {
+          "surface": "scopes",
+          "kind": "scopes-changed",
+          "before": ["erp:payments:release"],
+          "after": ["erp:payments:release", "erp:payments:2fa"],
+          "detail": "candidate requires an additional scope"
+        }
+      ],
+      "possible_rename": null,
+      "detail": "erp_release_payment now requires erp:payments:2fa",
+      "removed_error_codes": [],
+      "added_required_scopes": ["erp:payments:2fa"],
+      "candidate_required_scopes": ["erp:payments:release", "erp:payments:2fa"]
+    }
+  ],
+  "affected": [
+    {
+      "scenario_id": "TASK-10",
+      "requirement_ids": ["REQ-009"],
+      "agent": "silobench_agent",
+      "role": "ap_approver",
+      "matched_change_groups": ["CHG-001"],
+      "evidence": [{ "source": "trace", "detail": "baseline trace calls erp_release_payment" }]
+    }
+  ],
+  "selection": {
+    "replay_ids": ["TASK-10"],
+    "selected_count": 1,
+    "total_scenarios": 2,
+    "fail_closed_inclusions": []
+  },
+  "coverage_gaps": [],
+  "forbidden_notes": [],
+  "replay": { "invoked": false, "dry_run": false, "commands": [], "exit_codes": [], "results": [] },
+  "verdict": {
+    "state": "breaking",
+    "safe": false,
+    "breaking_group_count": 1,
+    "risky_group_count": 0,
+    "info_group_count": 0,
+    "affected_scenario_count": 1,
+    "replayed": 0,
+    "hard_failures": 0,
+    "state_failures": 0,
+    "notes": []
+  }
+}

@@ -1,0 +1,402 @@
+{
+  "format": "blast-radius.v1",
+  "baseline": {
+    "contracts": [
+      "fixtures\\silobench\\v1\\docs.contract.json",
+      "fixtures\\silobench\\v1\\erp.contract.json",
+      "fixtures\\silobench\\v1\\vdw.contract.json",
+      "fixtures\\silobench\\v1\\docs.sidecar.json",
+      "fixtures\\silobench\\v1\\erp.sidecar.json",
+      "fixtures\\silobench\\v1\\vdw.sidecar.json"
+    ],
+    "fingerprint": "9403e19c00a01d9ed90b7f6856c676ea0e8e67111d31a3adad32a234d00c2496"
+  },
+  "candidate": {
+    "contracts": [
+      "fixtures\\silobench\\v2\\docs.contract.json",
+      "fixtures\\silobench\\v2\\erp.contract.json",
+      "fixtures\\silobench\\v2\\vdw.contract.json",
+      "fixtures\\silobench\\v2\\docs.sidecar.json",
+      "fixtures\\silobench\\v2\\erp.sidecar.json",
+      "fixtures\\silobench\\v2\\vdw.sidecar.json"
+    ],
+    "fingerprint": "81c64e22fb13db3bc5014882ae31f9a12fb1e1352500b900692b75c9cd2661c3"
+  },
+  "change_groups": [
+    {
+      "id": "CHG-001",
+      "rule": "output-field-removed",
+      "severity": "breaking",
+      "server": "erp",
+      "tool": "erp_list_invoices",
+      "findings": [
+        {
+          "surface": "output:next_cursor",
+          "kind": "output-path-removed",
+          "before": "next_cursor",
+          "after": null,
+          "detail": "documented output field 'next_cursor' removed"
+        },
+        {
+          "surface": "output:page_token",
+          "kind": "output-path-added",
+          "before": null,
+          "after": "page_token",
+          "detail": "new output field 'page_token'"
+        }
+      ],
+      "possible_rename": {
+        "from": "next_cursor",
+        "to": "page_token"
+      },
+      "detail": "documented output of 'erp_list_invoices' lost field(s) ['next_cursor'] (source: sidecar)",
+      "removed_error_codes": [],
+      "added_required_scopes": [],
+      "candidate_required_scopes": []
+    },
+    {
+      "id": "CHG-002",
+      "rule": "input-removed-or-renamed",
+      "severity": "breaking",
+      "server": "erp",
+      "tool": "erp_release_payment",
+      "findings": [
+        {
+          "surface": "input:invoice_id",
+          "kind": "input-removed",
+          "before": {
+            "types": [
+              "string"
+            ],
+            "required": true
+          },
+          "after": null,
+          "detail": "required input 'invoice_id' no longer exists"
+        },
+        {
+          "surface": "input:invoice_ref",
+          "kind": "required-added",
+          "before": null,
+          "after": {
+            "types": [
+              "string"
+            ],
+            "required": true
+          },
+          "detail": "new REQUIRED input 'invoice_ref'; no existing caller passes it"
+        }
+      ],
+      "possible_rename": {
+        "from": "invoice_id",
+        "to": "invoice_ref"
+      },
+      "detail": "input contract of 'erp_release_payment' changed incompatibly",
+      "removed_error_codes": [],
+      "added_required_scopes": [],
+      "candidate_required_scopes": []
+    },
+    {
+      "id": "CHG-003",
+      "rule": "scope-changed",
+      "severity": "breaking",
+      "server": "erp",
+      "tool": "erp_release_payment",
+      "findings": [
+        {
+          "surface": "scopes",
+          "kind": "scopes-changed",
+          "before": [
+            "erp:payments:release"
+          ],
+          "after": [
+            "erp:payments:release",
+            "erp:payments:2fa"
+          ],
+          "detail": "required scopes changed: added=['erp:payments:2fa'], removed=[]"
+        }
+      ],
+      "possible_rename": null,
+      "detail": "required scopes of 'erp_release_payment' changed",
+      "removed_error_codes": [],
+      "added_required_scopes": [
+        "erp:payments:2fa"
+      ],
+      "candidate_required_scopes": [
+        "erp:payments:2fa",
+        "erp:payments:release"
+      ]
+    }
+  ],
+  "affected": [
+    {
+      "scenario_id": "TASK-01",
+      "requirement_ids": [
+        "REQ-003"
+      ],
+      "agent": "silobench_agent",
+      "role": "ap_clerk",
+      "matched_change_groups": [
+        "CHG-001"
+      ],
+      "evidence": [
+        {
+          "source": "trace",
+          "detail": "baseline result of erp_list_invoices contains 'next_cursor'"
+        }
+      ]
+    },
+    {
+      "scenario_id": "TASK-08",
+      "requirement_ids": [
+        "REQ-007"
+      ],
+      "agent": "silobench_agent",
+      "role": "ap_clerk",
+      "matched_change_groups": [
+        "CHG-002",
+        "CHG-003"
+      ],
+      "evidence": [
+        {
+          "source": "trace",
+          "detail": "baseline calls of erp_release_payment pass 'invoice_id'"
+        },
+        {
+          "source": "scenario",
+          "detail": "scenario args_subset pins 'invoice_id'"
+        },
+        {
+          "source": "trace",
+          "detail": "erp_release_payment called 1x; no baseline caller passes new required 'invoice_ref'"
+        },
+        {
+          "source": "scenario",
+          "detail": "scenario checks pin erp_release_payment"
+        },
+        {
+          "source": "trace",
+          "detail": "1 baseline call(s) of erp_release_payment"
+        }
+      ]
+    },
+    {
+      "scenario_id": "TASK-10",
+      "requirement_ids": [
+        "REQ-007",
+        "REQ-015"
+      ],
+      "agent": "silobench_agent",
+      "role": "ap_approver",
+      "matched_change_groups": [
+        "CHG-002",
+        "CHG-003"
+      ],
+      "evidence": [
+        {
+          "source": "trace",
+          "detail": "baseline calls of erp_release_payment pass 'invoice_id'"
+        },
+        {
+          "source": "scenario",
+          "detail": "scenario args_subset pins 'invoice_id'"
+        },
+        {
+          "source": "trace",
+          "detail": "erp_release_payment called 1x; no baseline caller passes new required 'invoice_ref'"
+        },
+        {
+          "source": "scenario",
+          "detail": "scenario checks pin erp_release_payment"
+        },
+        {
+          "source": "trace",
+          "detail": "1 baseline call(s) of erp_release_payment"
+        }
+      ]
+    },
+    {
+      "scenario_id": "TASK-12",
+      "requirement_ids": [
+        "REQ-016"
+      ],
+      "agent": "silobench_agent",
+      "role": "ap_clerk",
+      "matched_change_groups": [
+        "CHG-001"
+      ],
+      "evidence": [
+        {
+          "source": "trace",
+          "detail": "baseline result of erp_list_invoices contains 'next_cursor'"
+        }
+      ]
+    }
+  ],
+  "selection": {
+    "replay_ids": [
+      "TASK-01",
+      "TASK-08",
+      "TASK-10",
+      "TASK-12"
+    ],
+    "selected_count": 4,
+    "total_scenarios": 12,
+    "fail_closed_inclusions": []
+  },
+  "coverage_gaps": [],
+  "forbidden_notes": [
+    {
+      "scenario_id": "TASK-01",
+      "tool": "erp_release_payment",
+      "change_group_id": "CHG-002",
+      "detail": "TASK-01 forbids erp_release_payment; contract change cannot break it but is noted"
+    },
+    {
+      "scenario_id": "TASK-02",
+      "tool": "erp_release_payment",
+      "change_group_id": "CHG-002",
+      "detail": "TASK-02 forbids erp_release_payment; contract change cannot break it but is noted"
+    },
+    {
+      "scenario_id": "TASK-04",
+      "tool": "erp_release_payment",
+      "change_group_id": "CHG-002",
+      "detail": "TASK-04 forbids erp_release_payment; contract change cannot break it but is noted"
+    },
+    {
+      "scenario_id": "TASK-07",
+      "tool": "erp_release_payment",
+      "change_group_id": "CHG-002",
+      "detail": "TASK-07 forbids erp_release_payment; contract change cannot break it but is noted"
+    },
+    {
+      "scenario_id": "TASK-09",
+      "tool": "erp_release_payment",
+      "change_group_id": "CHG-002",
+      "detail": "TASK-09 forbids erp_release_payment; contract change cannot break it but is noted"
+    },
+    {
+      "scenario_id": "TASK-11",
+      "tool": "erp_release_payment",
+      "change_group_id": "CHG-002",
+      "detail": "TASK-11 forbids erp_release_payment; contract change cannot break it but is noted"
+    },
+    {
+      "scenario_id": "TASK-12",
+      "tool": "erp_release_payment",
+      "change_group_id": "CHG-002",
+      "detail": "TASK-12 forbids erp_release_payment; contract change cannot break it but is noted"
+    }
+  ],
+  "replay": {
+    "invoked": true,
+    "dry_run": false,
+    "commands": [
+      [
+        ".venv\\Scripts\\python.exe",
+        "tests\\helpers\\fake_gate.py",
+        "run",
+        "--mode",
+        "replay",
+        "--scenarios",
+        "tests\\data\\scenarios\\scenarios-approver.yaml",
+        "--fixtures",
+        "fixtures\\v2-traces",
+        "--only",
+        "TASK-10",
+        "--no-judge",
+        "--strict",
+        "--out",
+        "<tmp>/run-1.json",
+        "--state-checks",
+        "fixtures\\state-checks\\v2"
+      ],
+      [
+        ".venv\\Scripts\\python.exe",
+        "tests\\helpers\\fake_gate.py",
+        "run",
+        "--mode",
+        "replay",
+        "--scenarios",
+        "tests\\data\\scenarios\\scenarios-clerk.yaml",
+        "--fixtures",
+        "fixtures\\v2-traces",
+        "--only",
+        "TASK-01,TASK-08,TASK-12",
+        "--no-judge",
+        "--strict",
+        "--out",
+        "<tmp>/run-2.json",
+        "--state-checks",
+        "fixtures\\state-checks\\v2"
+      ]
+    ],
+    "exit_codes": [
+      1,
+      1
+    ],
+    "results": [
+      {
+        "scenario_id": "TASK-10",
+        "derived_passed": false,
+        "failed_checks": [
+          "expected_tools_ordered",
+          "output_contains:PAY-0001",
+          "no_tool_errors"
+        ],
+        "state_check_failures": [
+          "statediff:one-payment",
+          "statediff:approval-completed",
+          "statediff:verdict"
+        ],
+        "harness_error": null
+      },
+      {
+        "scenario_id": "TASK-01",
+        "derived_passed": true,
+        "failed_checks": [],
+        "state_check_failures": [],
+        "harness_error": null
+      },
+      {
+        "scenario_id": "TASK-08",
+        "derived_passed": false,
+        "failed_checks": [
+          "output_contains:PAY-",
+          "no_tool_errors"
+        ],
+        "state_check_failures": [
+          "statediff:one-payment",
+          "statediff:verdict"
+        ],
+        "harness_error": null
+      },
+      {
+        "scenario_id": "TASK-12",
+        "derived_passed": false,
+        "failed_checks": [
+          "expected_tools_ordered",
+          "output_contains:INV-2026-00363",
+          "output_contains:INV-2026-00360"
+        ],
+        "state_check_failures": [
+          "statediff:duplicate-flagged",
+          "statediff:verdict"
+        ],
+        "harness_error": null
+      }
+    ]
+  },
+  "verdict": {
+    "state": "breaking",
+    "safe": false,
+    "breaking_group_count": 3,
+    "risky_group_count": 0,
+    "info_group_count": 0,
+    "affected_scenario_count": 4,
+    "replayed": 4,
+    "hard_failures": 3,
+    "state_failures": 3,
+    "notes": []
+  }
+}

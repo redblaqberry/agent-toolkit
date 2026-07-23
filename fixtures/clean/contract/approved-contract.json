@@ -1,0 +1,93 @@
+{
+  "contract_version": "deployment-contract.v1",
+  "metadata": {
+    "project": "nordlicht-invoice-automation",
+    "customer": "Nordlicht GmbH",
+    "transcript": "transcript.md",
+    "transcript_sha256": "b727f06659ed4e94b1671a8fb0eaf1b15631e0a04136c8ffe145df01b129f97b",
+    "status": "approved",
+    "approved_by": "Anna Lindqvist (Operations), Jonas Weber (Security)",
+    "approved_at": "2026-07-16",
+    "approval_signature": {
+      "version": "attest.v1",
+      "kind": "deployment-contract",
+      "algorithm": "ed25519",
+      "public_key_fingerprint": "0f1e2d3c4b5a6978",
+      "digest_sha256": "9f2c1a7b3e5d4c6a8b0d2f4e6a8c0e2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c2e4b",
+      "signature": "AwoRGB8mLTQ7QklQV15lbHN6gYiPlp2kq7K5wMfO1dzj6vH4/wYNFBsiKTA3PkVMU1phaG92fYSLkpmgp661vA=="
+    }
+  },
+  "requirements": [
+    {
+      "id": "REQ-007",
+      "title": "Approver threshold EUR 500",
+      "statement": "Any payment above EUR 500 requires a named approver who did not raise the request.",
+      "category": "escalation",
+      "stakeholder": "Jonas Weber (Security)",
+      "source_turns": [23],
+      "followup_note": null,
+      "status": "resolved",
+      "conflicts_with": [],
+      "resolution": null
+    },
+    {
+      "id": "REQ-012",
+      "title": "Append-only audit log",
+      "statement": "Every agent or human action lands in an append-only audit log with the acting identity attached.",
+      "category": "security",
+      "stakeholder": "Jonas Weber (Security)",
+      "source_turns": [19],
+      "followup_note": null,
+      "status": "resolved",
+      "conflicts_with": [],
+      "resolution": null
+    },
+    {
+      "id": "REQ-016",
+      "title": "Duplicate-invoice escalation",
+      "statement": "On duplicate suspicion the agent stops and a human decides.",
+      "category": "escalation",
+      "stakeholder": "Anna Lindqvist (Operations)",
+      "source_turns": [31],
+      "followup_note": null,
+      "status": "resolved",
+      "conflicts_with": [],
+      "resolution": null
+    }
+  ],
+  "open_questions": [],
+  "kpis": [],
+  "roles": [],
+  "allowed_actions": [
+    {
+      "action": "release_payment",
+      "allowed_roles": ["ap_approver"],
+      "requires_human_approval": true,
+      "requirement_id": "REQ-007"
+    }
+  ],
+  "escalation_rules": [
+    {
+      "trigger": "duplicate suspicion",
+      "action": "stop and escalate to a human",
+      "requirement_id": "REQ-016"
+    }
+  ],
+  "security_constraints": [
+    {
+      "constraint": "audit log is append-only",
+      "requirement_id": "REQ-012"
+    }
+  ],
+  "slo": {
+    "p95_latency_ms": { "value": 2000, "requirement_id": "REQ-007" },
+    "cost_per_invoice_eur": { "value": 0.08, "requirement_id": "REQ-016" }
+  },
+  "environment": { "name": "staging", "seed": 4711, "requirement_id": "REQ-007" },
+  "data_governance": {
+    "owner": "Nordlicht GmbH",
+    "retention_days": 90,
+    "region": "EU",
+    "requirement_id": "REQ-012"
+  }
+}

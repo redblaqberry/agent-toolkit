@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.10", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      # Pinned transitives. A tool whose output is a signed, reproducible
+      # artifact has no business floating its own dependency versions.
+      - run: pip install -e ".[dev]" -c constraints.txt
+      - run: pytest -q
+      - run: revpack --help
+
+  # Cross-machine verification is the whole promise of the format, so this is
+  # split across two runners on two operating systems: the pack is built and
+  # sealed on Linux, uploaded as an artifact, and verified on Windows. An earlier
+  # version built, sealed, and verified in one step on one Linux runner, which
+  # could not fail on a cross-OS path or line-ending regression while claiming to
+  # cover exactly that. Byte-for-byte transport is what makes the claim real: the
+  # verifying job checks the repo out only to install the verifier, and the pack
+  # it verifies is the downloaded artifact rather than anything from that
+  # checkout, so the only pack bytes it sees are the ones the Linux job produced.
+  roundtrip-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -e "." -c constraints.txt
+      - name: Build and seal a pack, and keep the public key beside it
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          # The public key travels with the pack so the verifying job holds
+          # nothing but the artifact. The private key never leaves this runner.
+          revpack keygen --private /tmp/sign.pem --public out/verify.pem
+          revpack build \
+            -e contract=fixtures/clean/contract/approved-contract.json \
+            -e gate-run=fixtures/clean/gate-run/run.json \
+            -e state-verdict=fixtures/clean/state-verdict/SD-PAY-01.json \
+            -e blast-radius=fixtures/clean/blast-radius/report.json \
+            -e environment-golden=fixtures/clean/environment/golden-hashes.json \
+            -e silobench-verify=fixtures/clean/silobench-verify/verify.json \
+            --policy fixtures/clean/policy.yaml \
+            --release fixtures/clean/release.yaml \
+            --traceability fixtures/clean/traceability.yaml \
+            --out out/pack --collected-at "2026-01-01T00:00:00Z" --no-vcs
+          revpack seal --pack out/pack --key /tmp/sign.pem
+      - name: A defective release must be refused with exit 1
+        run: |
+          set -euo pipefail
+          # Exactly 1, never merely nonzero. Exit 2 is "could not decide or
+          # could not run", which an unknown option, a missing fixture, or a
+          # crash all produce, and a step that accepts any failure as proof of a
+          # refused release passes green while proving nothing. That is not
+          # hypothetical: this step ran for a while against an option `build`
+          # did not have, exited 2, and reported success.
+          status=0
+          revpack build \
+            -e contract=fixtures/clean/contract/approved-contract.json \
+            -e gate-run=fixtures/defect/gate-run/run.json \
+            -e state-verdict=fixtures/clean/state-verdict/SD-PAY-01.json \
+            -e blast-radius=fixtures/defect/blast-radius/report.json \
+            -e environment-golden=fixtures/clean/environment/golden-hashes.json \
+            -e silobench-verify=fixtures/defect/silobench-verify/verify.json \
+            --policy fixtures/clean/policy.yaml \
+            --release fixtures/clean/release.yaml \
+            --traceability fixtures/clean/traceability.yaml \
+            --out /tmp/pack-defect --collected-at "2026-01-01T00:00:00Z" --no-vcs || status=$?
+          if [ "$status" -ne 1 ]; then
+            echo "expected exit 1 (NO_GO), got $status" >&2
+            exit 1
+          fi
+          test "$(python -c 'import json,sys; print(json.load(open("/tmp/pack-defect/decision.json"))["state"])')" = "NO_GO"
+      # Preserves the exact bytes the Linux build produced. The verifying job
+      # downloads this and nothing else, so a path or newline that only works on
+      # the machine that wrote it fails there instead of hiding.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sealed-pack
+          path: out/
+          # A verifier that silently found no files would pass vacuously, so
+          # missing content is an error here rather than a warning.
+          if-no-files-found: error
+
+  # The other half of the promise: the pack built on Linux is verified on
+  # Windows, from the transported bytes alone. This is the step that actually
+  # exercises the LF-newline and POSIX-path pinning the format depends on;
+  # verifying a Linux-built pack on Linux never could.
+  roundtrip-verify:
+    needs: roundtrip-build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -e "." -c constraints.txt
+      - uses: actions/download-artifact@v4
+        with:
+          name: sealed-pack
+          path: incoming
+      - name: Verify the Linux-built pack on Windows
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Exit 0 is GO and nothing weaker is accepted: a pack that verified its
+          # integrity but could not recheck its verdict exits 2, and letting that
+          # through would report cross-OS verification as proven when it was not.
+          revpack verify --pack incoming/pack --key incoming/verify.pem
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install build
+      - run: python -m build
+      - name: Wheel install smoke test
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install dist/*.whl
+          /tmp/smoke/bin/revpack --help

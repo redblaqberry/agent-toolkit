@@ -1,0 +1,11 @@
+{
+  "format": "silobench-golden.v1",
+  "initial": {
+    "v1": "38d60e95a46f0f488c7a594b045df7110b774ed83db6aac35670b4720369a866",
+    "v2": "c6b1bcd35a594ddd20d5fdd98310c764db894ace9914b83ec53b4f0101b2cfa4"
+  },
+  "tasks": {
+    "TASK-10": "c9e50af80747b4a77681de98c9aaf44cec96c4809639e03791213e75eb743067",
+    "TASK-12": "8c74c201dca0c333de0fbdde373d6315505bd69396b98ceb7ac8743d52f31661"
+  }
+}

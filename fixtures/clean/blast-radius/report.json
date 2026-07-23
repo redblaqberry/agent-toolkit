@@ -1,0 +1,78 @@
+{
+  "format": "blast-radius.v1",
+  "baseline": {
+    "contracts": [
+      "fixtures/silobench/v1/erp.contract.json"
+    ],
+    "fingerprint": "9403e19c00a01d9ed90b7f6856c676ea0e8e67111d31a3adad32a234d00c2496"
+  },
+  "candidate": {
+    "contracts": [
+      "fixtures/silobench/v1/erp.contract.json"
+    ],
+    "fingerprint": "9403e19c00a01d9ed90b7f6856c676ea0e8e67111d31a3adad32a234d00c2496"
+  },
+  "change_groups": [],
+  "affected": [
+    {
+      "scenario_id": "TASK-10",
+      "requirement_ids": [
+        "REQ-007",
+        "REQ-012"
+      ],
+      "agent": "silobench_agent",
+      "role": "ap_approver",
+      "matched_change_groups": [],
+      "evidence": [
+        {
+          "source": "trace",
+          "detail": "baseline trace indexes erp_release_payment"
+        }
+      ]
+    },
+    {
+      "scenario_id": "TASK-12",
+      "requirement_ids": [
+        "REQ-016"
+      ],
+      "agent": "silobench_agent",
+      "role": "ap_clerk",
+      "matched_change_groups": [],
+      "evidence": [
+        {
+          "source": "trace",
+          "detail": "baseline trace indexes erp_flag_duplicate"
+        }
+      ]
+    }
+  ],
+  "selection": {
+    "replay_ids": [],
+    "selected_count": 0,
+    "total_scenarios": 2,
+    "fail_closed_inclusions": []
+  },
+  "coverage_gaps": [],
+  "forbidden_notes": [],
+  "replay": {
+    "invoked": false,
+    "dry_run": false,
+    "commands": [],
+    "exit_codes": [],
+    "results": []
+  },
+  "verdict": {
+    "state": "clean",
+    "safe": true,
+    "breaking_group_count": 0,
+    "risky_group_count": 0,
+    "info_group_count": 0,
+    "affected_scenario_count": 2,
+    "replayed": 0,
+    "hard_failures": 0,
+    "state_failures": 0,
+    "notes": [
+      "no contract change detected between baseline and candidate"
+    ]
+  }
+}

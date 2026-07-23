@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+
+# generated packs and key material
+/out/
+/pack/
+*.pem
+
+# internal working notes, never published
+PLAN.md
+HANDOFF.md
+*.local.md
+SESSION-HANDOFF.md

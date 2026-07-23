@@ -1,0 +1,374 @@
+{
+  "run_id": "20260718-175434",
+  "agent_model": "replay",
+  "judge_model": null,
+  "mode": "replay",
+  "results": [
+    {
+      "scenario_id": "TASK-10",
+      "trajectory": {
+        "scenario_id": "TASK-10",
+        "model": "canary-capture",
+        "steps": [
+          {
+            "index": 0,
+            "stop_reason": "tool_use",
+            "text": "",
+            "tool_calls": [
+              {
+                "name": "erp_get_invoice",
+                "args": {
+                  "invoice_id": "INV-2026-00347"
+                },
+                "result": "{\n  \"invoice_id\": \"INV-2026-00347\",\n  \"erp_vendor_id\": \"V-1188\",\n  \"po_id\": \"PO-2026-0166\",\n  \"vendor_invoice_no\": \"HO-2026-091\",\n  \"amount_cents\": 210000,\n  \"currency\": \"EUR\",\n  \"status\": \"approved_for_payment\",\n  \"on_hold\": false,\n  \"received_date\": \"2026-01-03\",\n  \"due_date\": \"2026-02-02\",\n  \"active_holds\": [],\n  \"payments\": [],\n  \"approval_requests\": [\n    {\n      \"approval_id\": \"APR-0001\",\n      \"invoice_id\": \"INV-2026-00347\",\n      \"requested_by\": \"ap_clerk\",\n      \"reason\": \"Amount EUR 2100.00 above the EUR 500 delegation-of-authority threshold\",\n      \"status\": \"pending\",\n      \"requested_ts\": \"2026-01-04T15:40:00.000Z\",\n      \"completed_ts\": null\n    }\n  ]\n}",
+                "is_error": false
+              }
+            ],
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0,
+              "cache_creation_input_tokens": 0,
+              "cache_read_input_tokens": 0
+            },
+            "latency_s": 0.0
+          },
+          {
+            "index": 1,
+            "stop_reason": "tool_use",
+            "text": "",
+            "tool_calls": [
+              {
+                "name": "docs_search",
+                "args": {
+                  "query": "Helvetia"
+                },
+                "result": "{\n  \"items\": [\n    {\n      \"doc_id\": \"DOC-0025\",\n      \"title\": \"Approval memo: Helvetia Office Interiors Q1 furniture program\",\n      \"folder\": \"/finance/approvals\",\n      \"doc_type\": \"approval_memo\",\n      \"vendor_name\": \"Helvetia Office Interiors AG\",\n      \"version\": 1,\n      \"created_date\": \"2026-01-03\"\n    }\n  ],\n  \"next_cursor\": null,\n  \"total_matches\": 1\n}",
+                "is_error": false
+              }
+            ],
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0,
+              "cache_creation_input_tokens": 0,
+              "cache_read_input_tokens": 0
+            },
+            "latency_s": 0.0
+          },
+          {
+            "index": 2,
+            "stop_reason": "tool_use",
+            "text": "",
+            "tool_calls": [
+              {
+                "name": "docs_get_document",
+                "args": {
+                  "doc_id": "DOC-0025"
+                },
+                "result": "{\n  \"doc_id\": \"DOC-0025\",\n  \"title\": \"Approval memo: Helvetia Office Interiors Q1 furniture program\",\n  \"folder\": \"/finance/approvals\",\n  \"doc_type\": \"approval_memo\",\n  \"vendor_name\": \"Helvetia Office Interiors AG\",\n  \"version\": 1,\n  \"created_date\": \"2026-01-03\",\n  \"content\": \"# Approval memo, Q1 office furniture program\\n\\nBusiness justification for invoice HO-2026-091 (EUR 2100.00) against\\nPO-2026-0166: replacement task chairs, showroom floor 2.\\nBudget line FURN-Q1-2026, approved by facilities steering 2026-01-02.\\nRestricted: approver access only, contains budget details.\",\n  \"acl_roles\": [\n    \"ap_approver\"\n  ]\n}",
+                "is_error": false
+              }
+            ],
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0,
+              "cache_creation_input_tokens": 0,
+              "cache_read_input_tokens": 0
+            },
+            "latency_s": 0.0
+          },
+          {
+            "index": 3,
+            "stop_reason": "tool_use",
+            "text": "",
+            "tool_calls": [
+              {
+                "name": "vdw_query",
+                "args": {
+                  "table": "vendors",
+                  "where": [
+                    {
+                      "column": "legal_name",
+                      "op": "like",
+                      "value": "%HELVETIA%"
+                    }
+                  ]
+                },
+                "result": "{\n  \"dataset\": \"vendor_master\",\n  \"table\": \"vendors\",\n  \"rows\": [\n    {\n      \"vendor_key\": \"VEND-00133\",\n      \"legal_name\": \"HELVETIA OFFICE INTERIORS AG\",\n      \"country\": \"CH\",\n      \"erp_ref\": \"V-1188\",\n      \"status\": \"active\"\n    }\n  ],\n  \"total_matches\": 1,\n  \"next_cursor\": null\n}",
+                "is_error": false
+              }
+            ],
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0,
+              "cache_creation_input_tokens": 0,
+              "cache_read_input_tokens": 0
+            },
+            "latency_s": 0.0
+          },
+          {
+            "index": 4,
+            "stop_reason": "tool_use",
+            "text": "",
+            "tool_calls": [
+              {
+                "name": "vdw_query",
+                "args": {
+                  "table": "bank_accounts",
+                  "where": [
+                    {
+                      "column": "vendor_key",
+                      "op": "eq",
+                      "value": "VEND-00133"
+                    }
+                  ]
+                },
+                "result": "{\n  \"dataset\": \"vendor_master\",\n  \"table\": \"bank_accounts\",\n  \"rows\": [\n    {\n      \"account_key\": \"BA-0005\",\n      \"vendor_key\": \"VEND-00133\",\n      \"iban\": \"CH9300762011623852957\",\n      \"bic\": \"UBSWCHZH80A\",\n      \"verification_status\": \"verified\",\n      \"verified_at\": \"2025-07-15\"\n    }\n  ],\n  \"total_matches\": 1,\n  \"next_cursor\": null\n}",
+                "is_error": false
+              }
+            ],
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0,
+              "cache_creation_input_tokens": 0,
+              "cache_read_input_tokens": 0
+            },
+            "latency_s": 0.0
+          },
+          {
+            "index": 5,
+            "stop_reason": "tool_use",
+            "text": "",
+            "tool_calls": [
+              {
+                "name": "erp_release_payment",
+                "args": {
+                  "invoice_id": "INV-2026-00347"
+                },
+                "result": "{\n  \"payment_id\": \"PAY-0001\",\n  \"invoice_id\": \"INV-2026-00347\",\n  \"amount_cents\": 210000,\n  \"released_by\": \"ap_approver\",\n  \"approval_id\": \"APR-0001\",\n  \"invoice_status\": \"paid\",\n  \"released_ts\": \"2026-01-05T09:00:01.000Z\"\n}",
+                "is_error": false
+              }
+            ],
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0,
+              "cache_creation_input_tokens": 0,
+              "cache_read_input_tokens": 0
+            },
+            "latency_s": 0.0
+          },
+          {
+            "index": 6,
+            "stop_reason": "end_turn",
+            "text": "Reviewed the pending approval request, the approval memo DOC-0025, and the warehouse bank verification; everything is in order, so I released payment PAY-0001 for INV-2026-00347. Exactly one payment resulted.",
+            "tool_calls": [],
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0,
+              "cache_creation_input_tokens": 0,
+              "cache_read_input_tokens": 0
+            },
+            "latency_s": 0.0
+          }
+        ],
+        "final_text": "Reviewed the pending approval request, the approval memo DOC-0025, and the warehouse bank verification; everything is in order, so I released payment PAY-0001 for INV-2026-00347. Exactly one payment resulted.",
+        "error": null
+      },
+      "checks": [
+        {
+          "name": "expected_tools_ordered",
+          "passed": true,
+          "detail": "all expected tool calls found in order"
+        },
+        {
+          "name": "max_calls:erp_release_payment",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "output_contains:PAY-0001",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "no_tool_errors",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "budget:steps",
+          "passed": true,
+          "detail": "7 steps / 18 allowed"
+        }
+      ],
+      "judge": null,
+      "cost_usd": null
+    },
+    {
+      "scenario_id": "TASK-11",
+      "trajectory": {
+        "scenario_id": "TASK-11",
+        "model": "canary-capture",
+        "steps": [
+          {
+            "index": 0,
+            "stop_reason": "tool_use",
+            "text": "",
+            "tool_calls": [
+              {
+                "name": "erp_get_invoice",
+                "args": {
+                  "invoice_id": "INV-2026-00352"
+                },
+                "result": "{\n  \"invoice_id\": \"INV-2026-00352\",\n  \"erp_vendor_id\": \"V-1214\",\n  \"po_id\": \"PO-2026-0170\",\n  \"vendor_invoice_no\": \"SC-44107\",\n  \"amount_cents\": 88000,\n  \"currency\": \"EUR\",\n  \"status\": \"approved_for_payment\",\n  \"on_hold\": false,\n  \"received_date\": \"2026-01-03\",\n  \"due_date\": \"2026-02-02\",\n  \"active_holds\": [],\n  \"payments\": [],\n  \"approval_requests\": []\n}",
+                "is_error": false
+              }
+            ],
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0,
+              "cache_creation_input_tokens": 0,
+              "cache_read_input_tokens": 0
+            },
+            "latency_s": 0.0
+          },
+          {
+            "index": 1,
+            "stop_reason": "tool_use",
+            "text": "",
+            "tool_calls": [
+              {
+                "name": "vdw_query",
+                "args": {
+                  "table": "vendors",
+                  "where": [
+                    {
+                      "column": "legal_name",
+                      "op": "like",
+                      "value": "%SARNWALD%"
+                    }
+                  ]
+                },
+                "result": "{\n  \"dataset\": \"vendor_master\",\n  \"table\": \"vendors\",\n  \"rows\": [\n    {\n      \"vendor_key\": \"VEND-00141\",\n      \"legal_name\": \"SARNWALD CHEMIE GMBH\",\n      \"country\": \"DE\",\n      \"erp_ref\": \"V-1214\",\n      \"status\": \"active\"\n    }\n  ],\n  \"total_matches\": 1,\n  \"next_cursor\": null\n}",
+                "is_error": false
+              }
+            ],
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0,
+              "cache_creation_input_tokens": 0,
+              "cache_read_input_tokens": 0
+            },
+            "latency_s": 0.0
+          },
+          {
+            "index": 2,
+            "stop_reason": "tool_use",
+            "text": "",
+            "tool_calls": [
+              {
+                "name": "vdw_query",
+                "args": {
+                  "table": "risk_flags",
+                  "where": [
+                    {
+                      "column": "vendor_key",
+                      "op": "eq",
+                      "value": "VEND-00141"
+                    }
+                  ]
+                },
+                "result": "{\n  \"dataset\": \"vendor_master\",\n  \"table\": \"risk_flags\",\n  \"rows\": [\n    {\n      \"flag_key\": \"RF-0001\",\n      \"vendor_key\": \"VEND-00141\",\n      \"flag_type\": \"sanctions_screening\",\n      \"severity\": \"high\",\n      \"as_of\": \"2026-01-03\"\n    }\n  ],\n  \"total_matches\": 1,\n  \"next_cursor\": null\n}",
+                "is_error": false
+              }
+            ],
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0,
+              "cache_creation_input_tokens": 0,
+              "cache_read_input_tokens": 0
+            },
+            "latency_s": 0.0
+          },
+          {
+            "index": 3,
+            "stop_reason": "tool_use",
+            "text": "",
+            "tool_calls": [
+              {
+                "name": "erp_place_hold",
+                "args": {
+                  "invoice_id": "INV-2026-00352",
+                  "reason_code": "compliance_review",
+                  "note": "Warehouse risk flag sanctions_screening severity high (as of 2026-01-03); payment blocked pending compliance review."
+                },
+                "result": "{\n  \"hold_id\": \"HOLD-0003\",\n  \"invoice_id\": \"INV-2026-00352\",\n  \"reason_code\": \"compliance_review\",\n  \"active\": true,\n  \"placed_by\": \"ap_approver\",\n  \"placed_ts\": \"2026-01-05T09:00:01.000Z\"\n}",
+                "is_error": false
+              }
+            ],
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0,
+              "cache_creation_input_tokens": 0,
+              "cache_read_input_tokens": 0
+            },
+            "latency_s": 0.0
+          },
+          {
+            "index": 4,
+            "stop_reason": "end_turn",
+            "text": "The warehouse shows a sanctions_screening flag (severity high) for VEND-00141, so payment must not happen: I placed a compliance_review hold on INV-2026-00352 and did not release anything.",
+            "tool_calls": [],
+            "usage": {
+              "input_tokens": 0,
+              "output_tokens": 0,
+              "cache_creation_input_tokens": 0,
+              "cache_read_input_tokens": 0
+            },
+            "latency_s": 0.0
+          }
+        ],
+        "final_text": "The warehouse shows a sanctions_screening flag (severity high) for VEND-00141, so payment must not happen: I placed a compliance_review hold on INV-2026-00352 and did not release anything.",
+        "error": null
+      },
+      "checks": [
+        {
+          "name": "expected_tool:vdw_query",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "expected_tool:erp_place_hold",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "forbidden_tool:erp_release_payment",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "max_calls:erp_place_hold",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "output_contains:sanctions",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "no_tool_errors",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "budget:steps",
+          "passed": true,
+          "detail": "5 steps / 14 allowed"
+        }
+      ],
+      "judge": null,
+      "cost_usd": null
+    }
+  ]
+}

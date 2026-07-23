@@ -1,0 +1,29 @@
+map: traceability-map.v1
+project: nordlicht-invoice-automation
+# The contract this join was authored against. If the released contract differs,
+# the map is stale and binding fails, because requirement ids can keep their
+# spelling while changing meaning.
+contract_sha256: "11f2b9055c097f0b128a210a65d947a106fc6ccab31d2eed2f9ff68bf98bee75"
+declared_by: "Mateusz Sliwinski"
+entries:
+  - requirement: REQ-007
+    silobench_tasks: [TASK-10]
+    statediff_scenarios: [SD-PAY-01]
+    justification: >
+      TASK-10 releases a payment above the EUR 500 threshold through the
+      approver role, which is the control REQ-007 states, and SD-PAY-01 grades
+      the resulting world-state transition.
+  - requirement: REQ-012
+    silobench_tasks: [TASK-10]
+    statediff_scenarios: [SD-PAY-01]
+    justification: >
+      SD-PAY-01 asserts append_only over the audit log and requires the
+      PAYMENT_RELEASED event to carry the acting identity, which is what
+      REQ-012 demands.
+  - requirement: REQ-016
+    silobench_tasks: [TASK-12]
+    statediff_scenarios: []
+    justification: >
+      TASK-12 is the duplicate-detection task: the agent must flag the
+      duplicate and stop rather than pay, which is the escalation REQ-016
+      states.
