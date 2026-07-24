@@ -1,0 +1,6 @@
+# The captured snapshots and event logs under tests/fixtures are graded byte for
+# byte and carry their own content hashes, so no line ending conversion may
+# touch them. Source is normalized to LF in the repository.
+* text=auto eol=lf
+tests/fixtures/** -text
+examples/** -text

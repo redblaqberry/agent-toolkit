@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "blastradius"
+version = "0.1.0"
+description = "Assert what your agent must and must not change in the world: a framework-neutral, fail-closed state oracle for agent side effects."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [{ name = "Mateusz Sliwinski" }]
+keywords = ["agent", "evaluation", "state", "side-effects", "mcp", "testing"]
+dependencies = [
+  "pydantic>=2.5",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# The SQL adapter (capture a database before/after) is optional so the core
+# library installs with almost nothing.
+sql = ["sqlalchemy>=2.0"]
+# The CLI uses typer; the library and pytest plugin do not need it.
+cli = ["typer>=0.12"]
+# Everything the test suite needs. This is an extra, not only a PEP 735
+# dependency group, because `pip install -e .` ignores groups: without it a
+# contributor runs the suite with the SQL adapter and the CLI silently absent
+# and sees a green run that skipped them.
+dev = ["pytest>=8.0", "typer>=0.12", "sqlalchemy>=2.0"]
+
+[project.scripts]
+blast = "blastradius.cli:main"
+
+[project.entry-points.pytest11]
+blastradius = "blastradius.pytest_plugin"
+
+[dependency-groups]
+dev = ["pytest>=8.0", "typer>=0.12", "sqlalchemy>=2.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/blastradius"]
