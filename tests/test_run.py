@@ -425,6 +425,111 @@ def test_judge_outage_makes_the_run_incomplete(scenarios, transcript):
     assert without["verdict"] == "PASS"
 
 
+def test_judge_outage_in_execute_scenarios_fails_criteria_not_the_run(scenarios):
+    """The handler that produces an outage, not just the rendering of one.
+
+    A judge that raises must fail that scenario's criteria and be reported, so
+    the run comes out INCOMPLETE; it must never take down the whole run or, far
+    worse, pass silently.
+    """
+    from discoveryspec import execute_scenarios
+
+    rubric_scenarios = [s for s in scenarios if s.rubric][:1]
+    assert rubric_scenarios, "the bundled suite should carry rubric scenarios"
+
+    class Adapter:
+        def run(self, scenario):
+            return passing_trajectory(scenario)
+
+    def exploding_judge(scenario, trajectory, model=None):
+        raise RuntimeError("judge endpoint down")
+
+    original = gate.judge_trajectory
+    gate.judge_trajectory = exploding_judge
+    try:
+        results, judge_errors = execute_scenarios(
+            rubric_scenarios, Adapter(), use_judge=True, judge_model="j"
+        )
+    finally:
+        gate.judge_trajectory = original
+
+    assert judge_errors == [rubric_scenarios[0].id]
+    verdicts = results[0].judge.criteria
+    assert verdicts and all(not c.passed for c in verdicts)
+    assert "judge call failed" in verdicts[0].reasoning
+    assert results[0].trajectory.error is None  # the trajectory itself was fine
+
+
+def test_adapter_crash_becomes_an_errored_trajectory(scenarios):
+    # a corrupt fixture or a broken adapter fails that scenario and keeps the
+    # run going, so the report can say which scenarios could not be executed
+    from discoveryspec import execute_scenarios
+
+    class Exploding:
+        def run(self, scenario):
+            raise OSError("fixture is shredded")
+
+    results, judge_errors = execute_scenarios(scenarios[:2], Exploding())
+    assert judge_errors == []
+    for result in results:
+        assert result.trajectory.error is not None
+        assert "OSError: fixture is shredded" in result.trajectory.error
+
+
+def test_a_malformed_step_latency_refuses_the_run(scenarios, transcript):
+    # an unmeasurable latency must refuse, not quietly skip the SLO it feeds
+    from discoveryspec import evaluate_slos, load_contract
+    from discoveryspec.scenarios import gate_export
+
+    contract = load_contract(APPROVED_PATH)
+    _, config_payload = gate_export(contract, transcript)
+
+    for bad_latency in (float("nan"), float("inf"), -0.5):
+        scenario = scenarios[0]
+        trajectory = passing_trajectory(scenario, latency_s=bad_latency)
+        result = gate.ScenarioResult(
+            scenario_id=scenario.id, trajectory=trajectory,
+            checks=gate.run_checks(scenario, trajectory),
+        )
+        with pytest.raises(RunError, match="invalid step latency"):
+            evaluate_slos([result], {scenario.id: 0.01}, config_payload["slo"])
+
+
+def test_price_table_is_refused_whole_when_any_entry_is_unusable():
+    """The docstring's claim, tested: a table is trustworthy or refused.
+
+    Validating only the entries a run happens to select would leave a zero or
+    NaN rate waiting for the run that picks it, and a zero rate lets any cost
+    pass the ceiling.
+    """
+    from discoveryspec.runner import validate_price_table
+
+    for table in ({}, [], "prices"):
+        with pytest.raises(RunError, match="non-empty JSON object"):
+            validate_price_table(table)
+
+    with pytest.raises(RunError) as excinfo:
+        validate_price_table({"claude-test": [3.0, 15.0]})
+    assert any("entry is not an object" in p for p in excinfo.value.problems)
+
+    for bad in (0, -1.0, float("nan"), float("inf")):
+        with pytest.raises(RunError) as excinfo:
+            validate_price_table(
+                {"claude-test": {"input_per_mtok": bad, "output_per_mtok": 15.0}}
+            )
+        assert any(
+            "finite and strictly positive" in p for p in excinfo.value.problems
+        ), bad
+
+    # an unusable entry is refused even when no trajectory would ever use it
+    with pytest.raises(RunError) as excinfo:
+        validate_price_table({
+            "claude-test": {"input_per_mtok": 3.0, "output_per_mtok": 15.0},
+            "never-selected": {"input_per_mtok": 0, "output_per_mtok": 15.0},
+        })
+    assert any("never-selected" in p for p in excinfo.value.problems)
+
+
 def test_percentile_nearest_rank():
     assert percentile_nearest_rank([float(n) for n in range(1, 11)], 95) == 10.0
     assert percentile_nearest_rank([5.0], 95) == 5.0
