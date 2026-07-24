@@ -39,6 +39,59 @@ def transcript_module():
     return parse_transcript(TRANSCRIPT_PATH)
 
 
+def test_strengthened_scenarios_reject_the_audit_adversarial_cases(scenarios):
+    """The clerk scenario must reject an evasive non-answer, and the cost
+    scenario must reject a double extraction, deterministically."""
+    gate = pytest.importorskip("agent_eval_gate")
+
+    by_id = {s.id: s for s in scenarios}
+    clerk = by_id["clerk-cannot-release-postings"].to_gate_dict()
+    cost = by_id["cost-ceiling-single-pass"].to_gate_dict()
+    threshold = by_id["amount-above-threshold-requires-signoff"]
+
+    # the clerk scenario now requires a refusal marker; a bare "banana" fails
+    clerk_scenario = gate.Scenario.model_validate(clerk)
+    banana = gate.Trajectory(
+        scenario_id=clerk_scenario.id, model="m",
+        steps=[gate.StepRecord(index=0, stop_reason="end_turn", text="banana",
+                               usage=gate.Usage(), latency_s=0.1)],
+        final_text="banana")
+    results = gate.run_checks(clerk_scenario, banana)
+    assert not all(c.passed for c in results), "banana must fail the clerk check"
+
+    # the cost scenario now caps extract_fields at one; two calls fail
+    cost_scenario = gate.Scenario.model_validate(cost)
+    double = gate.Trajectory(
+        scenario_id=cost_scenario.id, model="m",
+        steps=[gate.StepRecord(
+            index=0, stop_reason="end_turn", text="done",
+            tool_calls=[
+                gate.ToolCallRecord(name="read_invoice", args={}),
+                gate.ToolCallRecord(name="extract_fields", args={}),
+                gate.ToolCallRecord(name="extract_fields", args={}),
+            ],
+            usage=gate.Usage(), latency_s=0.1)],
+        final_text="done")
+    results = gate.run_checks(cost_scenario, double)
+    failed = [c for c in results if not c.passed]
+    assert any("max_calls:extract_fields" in c.name for c in failed)
+
+    # the above-threshold amount is derived from the rule, always above it
+    assert f"EUR {1200}" not in threshold.user_message or "500" in threshold.user_message
+
+
+def test_every_scenario_carries_a_manager_label(scenarios, approved_contract, transcript_module):
+    # the plain-language label lives in the template, never invented at render
+    # time, so manager-facing text cannot drift from what the test checks
+    from discoveryspec import gate_export
+
+    for scenario in scenarios:
+        assert scenario.manager_label.strip(), scenario.id
+    _, config_payload = gate_export(approved_contract, transcript_module)
+    for scenario_id, prov in config_payload["scenario_provenance"].items():
+        assert prov["manager_label"].strip(), scenario_id
+
+
 def test_exactly_ten_scenarios_with_unique_ids(scenarios):
     assert len(scenarios) == EXPECTED_SCENARIO_COUNT == 10
     assert len({s.id for s in scenarios}) == 10

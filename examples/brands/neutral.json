@@ -1,0 +1,28 @@
+{
+  "schema_version": "brand.v1",
+  "identity": {
+    "company": "DiscoverySpec",
+    "product_line": null
+  },
+  "palette": {
+    "paper": "#f6f7f5",
+    "ink": "#1e2833",
+    "muted_ink": "#57646f",
+    "accent": "#33618f",
+    "pass_background": "#e7f2ec",
+    "pass_ink": "#1f5942",
+    "fail_background": "#f8ebe9",
+    "fail_ink": "#9c2f28"
+  },
+  "typography": {
+    "display_stack": ["Iowan Old Style", "Palatino Linotype", "Georgia", "serif"],
+    "body_stack": ["Segoe UI", "system-ui", "sans-serif"],
+    "mono_stack": ["Consolas", "Menlo", "monospace"]
+  },
+  "policy": {
+    "max_corner_radius_px": 2,
+    "allow_shadows": false,
+    "allow_gradients": false,
+    "allow_emoji": false
+  }
+}

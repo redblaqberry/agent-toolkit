@@ -155,6 +155,10 @@ class Metadata(StrictModel):
     status: Literal["draft", "approved"]
     approved_by: Optional[str]
     approved_at: Optional[DateStr]
+    # Ed25519 attestation written by `approve --signing-key`; opaque to the
+    # model (its shape is checked cryptographically in discoveryspec.attest),
+    # excluded from its own digest. None on unsigned and draft contracts.
+    approval_signature: Optional[dict] = None
 
 
 class DeploymentContract(StrictModel):

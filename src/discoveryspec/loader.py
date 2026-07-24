@@ -50,30 +50,41 @@ def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict:
     return obj
 
 
-def load_contract(path: str | Path) -> DeploymentContract:
-    """Parse, schema-check, and model-check a contract file.
+def parse_contract_json(text: str) -> object:
+    """Parse contract JSON text with the fail-closed guards: NaN/Infinity
+    constants and duplicate keys are rejected, never silently accepted.
+    Raises ValueError on any violation."""
+    return json.loads(
+        text,
+        parse_constant=_reject_constant,
+        object_pairs_hook=_reject_duplicate_keys,
+    )
 
-    Raises ContractLoadError listing every problem found; never returns a
-    partially valid contract. NaN/Infinity literals, invalid UTF-8, and
-    unreadable files all fail here.
-    """
+
+def load_contract_raw(path: str | Path) -> dict:
+    """Parse a contract file into a raw dict with the fail-closed JSON guards
+    (no NaN/Infinity constants, no duplicate keys); the schema and model
+    checks happen in ``contract_from_raw``."""
     path = Path(path)
     try:
-        raw = json.loads(
-            path.read_text(encoding="utf-8"),
-            parse_constant=_reject_constant,
-            object_pairs_hook=_reject_duplicate_keys,
-        )
+        return parse_contract_json(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:  # ValueError covers JSON and UTF-8 decoding
         raise ContractLoadError(str(path), [f"cannot read contract JSON: {exc}"]) from exc
 
+
+def contract_from_raw(raw: object, source: str) -> DeploymentContract:
+    """Schema-check and model-check an already-parsed contract document.
+
+    ``source`` labels the document in error messages (a file path, or a
+    marker like ``<stamped contract>`` for in-memory documents).
+    """
     validator = Draft202012Validator(load_schema())
     problems = [
         f"schema: {'/'.join(str(p) for p in error.absolute_path) or '<root>'}: {error.message}"
         for error in sorted(validator.iter_errors(raw), key=lambda e: str(e.absolute_path))
     ]
     if problems:
-        raise ContractLoadError(str(path), problems)
+        raise ContractLoadError(source, problems)
 
     try:
         return DeploymentContract.model_validate(raw)
@@ -82,4 +93,15 @@ def load_contract(path: str | Path) -> DeploymentContract:
             f"model: {'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}"
             for err in exc.errors()
         ]
-        raise ContractLoadError(str(path), problems) from exc
+        raise ContractLoadError(source, problems) from exc
+
+
+def load_contract(path: str | Path) -> DeploymentContract:
+    """Parse, schema-check, and model-check a contract file.
+
+    Raises ContractLoadError listing every problem found; never returns a
+    partially valid contract. NaN/Infinity literals, invalid UTF-8, and
+    unreadable files all fail here.
+    """
+    path = Path(path)
+    return contract_from_raw(load_contract_raw(path), str(path))
