@@ -138,14 +138,25 @@ def _scenario_from_rule(
 
     if rule.type == "latency":
         slo = contract.slo.p95_latency_ms
+        # both refusals below are unreachable through any command, because the
+        # validator rejects a latency rule without max_steps and an approved
+        # contract with a null SLO; they stay as the local invariant of a
+        # function that would otherwise produce a budget from None
         if slo is None:
             raise CompileError(
                 f"{rule.id} exercises the latency ceiling, but the contract has no "
                 f"slo.p95_latency_ms to measure against"
             )
-        # a single run approximates the statistical p95, which the run command
-        # measures across the whole suite; here the budget bounds the scenario
-        # at the per-step ceiling the customer stated, times the steps it takes
+        if rule.max_steps is None:
+            raise CompileError(
+                f"{rule.id} is a latency rule without max_steps, so there is no "
+                f"step count to turn the per-step ceiling into a budget"
+            )
+        # the per-scenario budget is the stated per-step ceiling times the steps
+        # this rule ALLOWS, so a trajectory that takes fewer, slower steps can
+        # still sit inside it. It is a coarse bound on the scenario; the actual
+        # per-step ceiling is enforced statistically across the whole run by
+        # evaluate_slos, which is where a breach is caught.
         budgets["max_latency_s"] = (slo.value / 1000) * rule.max_steps
     if rule.type == "cost" and contract.slo.cost_per_task_eur is None:
         raise CompileError(
