@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    # Windows is in the matrix on purpose: the bundled example is byte-pinned
+    # (metadata.transcript_sha256), so any line-ending conversion on checkout
+    # makes the golden-contract tests fail there and nowhere else.
+    name: test (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.10", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: uv sync --extra dev --python ${{ matrix.python }}
+      - run: uv run pytest
+      - run: uv run discoveryspec --help
+      # the README's first command: it fails if the example bytes ever drift
+      - run: uv run discoveryspec validate --contract examples/invoice_automation/draft-contract.json
+      - run: uv build
+      - name: Wheel install smoke test
+        shell: bash
+        run: |
+          uv venv wheel-smoke --python ${{ matrix.python }}
+          uv pip install --python wheel-smoke dist/*.whl
+          if [ -d wheel-smoke/bin ]; then BIN=wheel-smoke/bin; else BIN=wheel-smoke/Scripts; fi
+          "$BIN/discoveryspec" --help
+
+  integration:
+    # The test job runs without agent-eval-gate, so every test that executes
+    # through it is skipped there. This job installs it and un-skips them, so
+    # the cross-repo claim (the export loads and runs in the gate's own loader)
+    # is actually verified rather than asserted in the README.
+    name: integration (agent-eval-gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+      - run: uv sync --extra dev
+      - name: Install agent-eval-gate
+        run: uv pip install "git+https://github.com/redblaqberry/agent-eval-gate"
+      - run: uv run pytest -q
+      - name: Export the acceptance suite from the approved contract
+        run: |
+          uv run discoveryspec export-gate \
+            --contract examples/invoice_automation/approved-contract.json \
+            --out ci-export
