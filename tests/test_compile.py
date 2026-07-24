@@ -366,9 +366,9 @@ def test_claude_extraction_end_to_end(draft_dict, transcript):
     assert len(report.conflict_groups) == 3  # the seeded conflicts survive extraction
 
     call = client.calls[0]
-    assert call["model"] == "claude-opus-4-8"
+    assert call["model"] == "claude-opus-5"
     assert call["thinking"] == {"type": "adaptive"}
-    assert "deployment-contract.v1" in call["system"]  # schema rides in the prompt
+    assert "deployment-contract.v2" in call["system"]  # schema rides in the prompt
     assert "[T01]" in call["messages"][0]["content"]  # canonical numbered turns
 
 

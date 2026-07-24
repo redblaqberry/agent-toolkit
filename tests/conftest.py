@@ -13,6 +13,12 @@ TRANSCRIPT_PATH = EXAMPLE / "transcript.md"
 DRAFT_PATH = EXAMPLE / "draft-contract.json"
 APPROVED_PATH = EXAMPLE / "approved-contract.json"
 
+# the second business domain, which exists to prove the compiler is not bound
+# to the first one
+REFUND = REPO / "examples" / "refund_handling"
+REFUND_TRANSCRIPT_PATH = REFUND / "transcript.md"
+REFUND_APPROVED_PATH = REFUND / "approved-contract.json"
+
 
 @pytest.fixture(scope="session")
 def transcript():

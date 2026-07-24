@@ -1,7 +1,8 @@
 {
-  "contract_version": "deployment-contract.v1",
+  "contract_version": "deployment-contract.v2",
   "metadata": {
     "project": "fixture-approved-open-conflict",
+    "system": "supplier-invoice agent",
     "customer": "Nordlicht GmbH",
     "transcript": "transcript.md",
     "transcript_sha256": null,
@@ -108,8 +109,9 @@
       "value": 2000,
       "requirement_id": "REQ-003"
     },
-    "cost_per_invoice_eur": {
+    "cost_per_task_eur": {
       "value": 0.08,
+      "unit": "invoice",
       "requirement_id": "REQ-004"
     }
   },
@@ -123,5 +125,6 @@
     "retention_days": 90,
     "region": "EU",
     "requirement_id": "REQ-006"
-  }
+  },
+  "acceptance_rules": []
 }

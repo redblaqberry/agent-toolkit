@@ -1,7 +1,8 @@
 {
-  "contract_version": "deployment-contract.v1",
+  "contract_version": "deployment-contract.v2",
   "metadata": {
     "project": "fixture-dangling-turn",
+    "system": "supplier-invoice agent",
     "customer": "Nordlicht GmbH",
     "transcript": "transcript.md",
     "transcript_sha256": null,
@@ -33,8 +34,9 @@
   "security_constraints": [],
   "slo": {
     "p95_latency_ms": null,
-    "cost_per_invoice_eur": null
+    "cost_per_task_eur": null
   },
   "environment": null,
-  "data_governance": null
+  "data_governance": null,
+  "acceptance_rules": []
 }

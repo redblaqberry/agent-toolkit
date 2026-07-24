@@ -17,7 +17,6 @@ from discoveryspec import (
     validate_contract,
 )
 from discoveryspec.cli import app
-from discoveryspec.scenarios import EXPECTED_SCENARIO_COUNT
 from tests.conftest import APPROVED_PATH, DRAFT_PATH, TRANSCRIPT_PATH
 
 runner = CliRunner()
@@ -77,8 +76,8 @@ def test_strengthened_scenarios_reject_the_audit_adversarial_cases(scenarios):
     failed = [c for c in results if not c.passed]
     assert any("max_calls:extract_fields" in c.name for c in failed)
 
-    # the above-threshold amount is derived from the rule, always above it
-    assert f"EUR {1200}" not in threshold.user_message or "500" in threshold.user_message
+    # the above-threshold case sends an amount over the contract's own ceiling
+    assert "EUR 1000" in threshold.user_message
 
 
 def test_every_scenario_carries_a_manager_label(scenarios, approved_contract, transcript_module):
@@ -93,9 +92,12 @@ def test_every_scenario_carries_a_manager_label(scenarios, approved_contract, tr
         assert prov["manager_label"].strip(), scenario_id
 
 
-def test_exactly_ten_scenarios_with_unique_ids(scenarios):
-    assert len(scenarios) == EXPECTED_SCENARIO_COUNT == 10
+def test_one_scenario_per_acceptance_rule_with_unique_ids(scenarios, approved_contract):
+    # the suite size is a property of the contract now, not a constant in the
+    # compiler: ten rules in, ten scenarios out
+    assert len(scenarios) == len(approved_contract.acceptance_rules) == 10
     assert len({s.id for s in scenarios}) == 10
+    assert [s.id for s in scenarios] == [r.slug for r in approved_contract.acceptance_rules]
 
 
 def test_success_metric_every_scenario_keeps_provenance(
@@ -214,10 +216,12 @@ def test_dropping_an_escalation_rule_strands_its_requirement(
     assert report.unwired_requirements == ["REQ-016"]
 
 
-def test_missing_escalation_rule_fails_closed(approved_dict, transcript_module):
-    # the same deletion, with the stranded requirement removed too, so the
-    # contract is otherwise clean: compilation must still refuse rather than
-    # silently emit fewer scenarios than the suite promises
+def test_deleting_a_requirement_strands_its_acceptance_rule(
+    approved_dict, transcript_module
+):
+    # removing the promise and the section that carried it leaves RULE-005
+    # enforcing something that no longer exists; compilation must refuse rather
+    # than emit a suite quietly missing a scenario
     approved_dict["escalation_rules"] = [
         r for r in approved_dict["escalation_rules"] if "duplicate" not in r["trigger"]
     ]
@@ -225,22 +229,99 @@ def test_missing_escalation_rule_fails_closed(approved_dict, transcript_module):
         r for r in approved_dict["requirements"] if r["id"] != "REQ-016"
     ]
     contract = DeploymentContract.model_validate(approved_dict)
-    assert validate_contract(contract, transcript_module).exit_code == 0
-    with pytest.raises(CompileError, match="duplicate"):
+    report = validate_contract(contract, transcript_module)
+    assert report.exit_code == 2
+    assert any("enforces unknown requirement REQ-016" in e for e in report.errors)
+    with pytest.raises(CompileError, match="does not validate cleanly"):
         compile_scenarios(contract, transcript_module)
 
 
-def test_formatted_eur_amount_parses_fully(approved_dict, transcript_module):
-    """'EUR 1,500' must parse as 1500, never silently truncate to 1."""
-    for rule in approved_dict["escalation_rules"]:
-        if "invoice_amount" in rule["trigger"]:
-            rule["trigger"] = "invoice_amount above EUR 1,500"
-    contract = DeploymentContract.model_validate(approved_dict)
-    scenarios = compile_scenarios(contract, transcript_module)
-    threshold = next(
-        s for s in scenarios if s.id == "amount-above-threshold-requires-signoff"
+def test_description_is_composed_from_the_rule(scenarios, approved_contract):
+    # the Given/When/Then is contract text rendered mechanically, so nothing in
+    # the compiler can invent prose the contract does not say
+    by_slug = {r.slug: r for r in approved_contract.acceptance_rules}
+    for scenario in scenarios:
+        rule = by_slug[scenario.id]
+        assert scenario.description == (
+            f"Given {rule.given}, when {rule.when}, then {rule.then}. "
+            f"[{', '.join(scenario.requirement_ids)}]"
+        )
+
+
+def test_a_rule_naming_an_unknown_action_is_refused(approved_dict, transcript_module):
+    approved_dict["acceptance_rules"][0]["expect"]["actions"].append(
+        {"name": "wire_money_somewhere"}
     )
-    assert "EUR 1500" in threshold.description
+    contract = DeploymentContract.model_validate(approved_dict)
+    report = validate_contract(contract, transcript_module)
+    assert report.exit_code == 2
+    assert any("not in the contract's allowed_actions" in e for e in report.errors)
+
+
+def test_a_rule_with_no_observable_outcome_is_refused(approved_dict, transcript_module):
+    # a scenario that checks nothing cannot fail, so it would add a passing row
+    # to the report having proven nothing
+    rule = approved_dict["acceptance_rules"][0]
+    rule["expect"] = {}
+    rule["rubric"] = []
+    contract = DeploymentContract.model_validate(approved_dict)
+    report = validate_contract(contract, transcript_module)
+    assert report.exit_code == 2
+    assert any("no observable outcome" in e for e in report.errors)
+
+
+def test_approved_contract_without_acceptance_rules_is_refused(
+    approved_dict, transcript_module
+):
+    approved_dict["acceptance_rules"] = []
+    contract = DeploymentContract.model_validate(approved_dict)
+    # the coverage gate fires first: behavioral promises now have no rule at all
+    report = validate_contract(contract, transcript_module)
+    assert report.exit_code == 1
+    assert "REQ-003" in report.untestable_requirements
+    with pytest.raises(CompileError, match="does not validate cleanly"):
+        compile_scenarios(contract, transcript_module)
+
+
+def test_uncovered_behavioral_requirement_blocks_export(
+    approved_dict, transcript_module
+):
+    # drop the rule that covers the injection requirement and nothing replaces it
+    approved_dict["acceptance_rules"] = [
+        r for r in approved_dict["acceptance_rules"] if r["id"] != "RULE-007"
+    ]
+    contract = DeploymentContract.model_validate(approved_dict)
+    report = validate_contract(contract, transcript_module)
+    assert report.untestable_requirements == ["REQ-013"]
+    assert report.exit_code == 1
+    with pytest.raises(CompileError, match="does not validate cleanly"):
+        compile_scenarios(contract, transcript_module)
+
+
+def test_out_of_band_requirements_travel_with_the_export(
+    approved_contract, transcript_module
+):
+    # what the suite does not check is stated, not left to be inferred
+    _, config_payload = gate_export(approved_contract, transcript_module)
+    not_covered = {entry["requirement_id"]: entry for entry in config_payload["not_covered"]}
+    assert set(not_covered) == {"REQ-011", "REQ-012"}
+    for entry in not_covered.values():
+        assert entry["reason"].strip()
+        assert entry["verified_by"].strip()
+
+
+def test_a_requirement_cannot_be_both_tested_and_excused(
+    approved_dict, transcript_module
+):
+    by_id = {r["id"]: r for r in approved_dict["requirements"]}
+    by_id["REQ-013"]["out_of_band_verification"] = {
+        "reason": "handled by the platform",
+        "verified_by": "somebody",
+    }
+    contract = DeploymentContract.model_validate(approved_dict)
+    report = validate_contract(contract, transcript_module)
+    assert report.exit_code == 2
+    assert any("never claimed as both" in e for e in report.errors)
 
 
 def test_inverted_resolution_direction_fails_closed(approved_dict, transcript_module):
@@ -265,7 +346,9 @@ def test_inverted_resolution_direction_fails_closed(approved_dict, transcript_mo
         c for c in approved_dict["security_constraints"] if c["requirement_id"] != "REQ-005"
     ]
     contract = DeploymentContract.model_validate(approved_dict)
-    with pytest.raises(CompileError, match="rejected"):
+    report = validate_contract(contract, transcript_module)
+    assert any("REJECTED" in e for e in report.errors), report.errors
+    with pytest.raises(CompileError, match="does not validate cleanly"):
         compile_scenarios(contract, transcript_module)
 
 
@@ -280,7 +363,11 @@ def test_gate_export_payload_shapes(approved_contract, transcript_module):
         assert entry["tags"], entry["id"]
         assert any(tag.startswith("REQ-") for tag in entry["tags"])
         assert any(tag.startswith("T") and tag[1:].isdigit() for tag in entry["tags"])
-    assert config_payload["slo"] == {"p95_latency_ms": 2000, "cost_per_invoice_eur": 0.08}
+    assert config_payload["slo"] == {
+        "p95_latency_ms": 2000,
+        "cost_per_task_eur": 0.08,
+        "task_unit": "invoice",
+    }
     assert len(config_payload["scenario_provenance"]) == 10
     assert config_payload["source"]["transcript_sha256"]
 
@@ -294,7 +381,8 @@ def test_cli_export_gate_writes_artifacts(tmp_path):
     data = yaml.safe_load((out / "scenarios.yaml").read_text(encoding="utf-8"))
     assert len(data["scenarios"]) == 10
     config = json.loads((out / "gate-config.json").read_text(encoding="utf-8"))
-    assert config["slo"]["cost_per_invoice_eur"] == 0.08
+    assert config["slo"]["cost_per_task_eur"] == 0.08
+    assert config["slo"]["task_unit"] == "invoice"
 
 
 def test_cli_export_gate_refuses_draft(tmp_path):

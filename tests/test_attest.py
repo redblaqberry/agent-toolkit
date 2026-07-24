@@ -48,7 +48,7 @@ def pub(keys):
 
 
 CONTRACT = {
-    "contract_version": "deployment-contract.v1",
+    "contract_version": "deployment-contract.v2",
     "metadata": {"project": "p", "customer": "c", "status": "approved",
                  "approved_by": "Anna, Jonas, Priya", "approved_at": "2026-07-16",
                  "transcript_sha256": "ab" * 32},

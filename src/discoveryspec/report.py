@@ -380,6 +380,8 @@ def build_view(
     return {
         "customer": contract.metadata.customer,
         "project": contract.metadata.project,
+        "system": contract.metadata.system,
+        "not_covered": list(run_report.get("not_covered", [])),
         "approved_by": contract.metadata.approved_by or "",
         "approved_at": contract.metadata.approved_at or "",
         "run_id": run_report.get("run_id", ""),
@@ -397,7 +399,7 @@ def build_view(
         "not_run": not_run,
         "slo": [
             {
-                "name": "Response time per clerk-facing step (95th percentile)",
+                "name": "Response time per interactive step (95th percentile)",
                 "agreed": f"{slo['p95_latency_ms']['limit']} ms",
                 "observed": (
                     f"{slo['p95_latency_ms']['observed']} ms"
@@ -407,14 +409,14 @@ def build_view(
                 "passed": slo["p95_latency_ms"]["passed"],
             },
             {
-                "name": "Cost per processed invoice, worst case",
-                "agreed": f"EUR {slo['cost_per_invoice_eur']['limit']}",
+                "name": f"Cost per processed {slo['cost_per_task_eur'].get('unit', 'task')}, worst case",
+                "agreed": f"EUR {slo['cost_per_task_eur']['limit']}",
                 "observed": (
-                    f"EUR {slo['cost_per_invoice_eur']['max_observed']}"
-                    if slo["cost_per_invoice_eur"]["max_observed"] is not None
+                    f"EUR {slo['cost_per_task_eur']['max_observed']}"
+                    if slo["cost_per_task_eur"]["max_observed"] is not None
                     else "not measured"
                 ),
-                "passed": slo["cost_per_invoice_eur"]["passed"],
+                "passed": slo["cost_per_task_eur"]["passed"],
             },
         ],
         "conflicts": conflicts,
@@ -441,7 +443,7 @@ TEMPLATE = """<!doctype html>
 <div class="page">
   <header class="masthead">
     <p class="eyebrow">Deployment contract compliance report</p>
-    <h1>{{ view.customer }}: supplier-invoice agent, acceptance run</h1>
+    <h1>{{ view.customer }}: {{ view.system }}, acceptance run</h1>
     <div class="masthead-meta">
       <span>Contract signed <strong>{{ view.approved_at }}</strong></span>
       <span>Approved by <strong>{{ view.approved_by }}</strong></span>
@@ -540,6 +542,23 @@ TEMPLATE = """<!doctype html>
       </table>
     </div>
   </section>
+
+  {% if view.not_covered %}
+  <section>
+    <h2>What this suite does not check</h2>
+    <div class="evidence">
+      <p class="what">These commitments cannot be observed in an agent's
+      actions, so no test above covers them. They were agreed and remain
+      binding; each is checked by the named party instead.</p>
+      <ul>
+        {% for entry in view.not_covered %}
+        <li>{{ entry.title }} ({{ entry.stakeholder }}): {{ entry.reason }}
+        Verified by {{ entry.verified_by }}.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+  {% endif %}
 
   {% if view.conflicts %}
   <section>

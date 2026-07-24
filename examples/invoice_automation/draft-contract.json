@@ -1,7 +1,8 @@
 {
-  "contract_version": "deployment-contract.v1",
+  "contract_version": "deployment-contract.v2",
   "metadata": {
     "project": "nordlicht-invoice-automation",
+    "system": "supplier-invoice agent",
     "customer": "Nordlicht GmbH",
     "transcript": "transcript.md",
     "transcript_sha256": "b727f06659ed4e94b1671a8fb0eaf1b15631e0a04136c8ffe145df01b129f97b",
@@ -405,12 +406,13 @@
       "value": 2000,
       "requirement_id": "REQ-010"
     },
-    "cost_per_invoice_eur": null
+    "cost_per_task_eur": null
   },
   "environment": {
     "name": "staging",
     "seed": 4711,
     "requirement_id": "REQ-018"
   },
-  "data_governance": null
+  "data_governance": null,
+  "acceptance_rules": []
 }

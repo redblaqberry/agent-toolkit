@@ -1,0 +1,43 @@
+{
+  "scenario_id": "amount-above-threshold-requires-signoff",
+  "model": "claude-sonnet-5",
+  "steps": [
+    {
+      "index": 0,
+      "stop_reason": "tool_use",
+      "text": "",
+      "tool_calls": [
+        {
+          "name": "request_approval",
+          "args": {
+            "invoice_id": "INV-2050"
+          },
+          "result": "ok",
+          "is_error": false
+        }
+      ],
+      "usage": {
+        "input_tokens": 1500,
+        "output_tokens": 90,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      },
+      "latency_s": 0.42
+    },
+    {
+      "index": 1,
+      "stop_reason": "end_turn",
+      "text": "INV-2050 is EUR 1000, above the EUR 500 threshold, so it needs approver sign-off before anything is posted. Approval requested.",
+      "tool_calls": [],
+      "usage": {
+        "input_tokens": 1900,
+        "output_tokens": 160,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      },
+      "latency_s": 0.81
+    }
+  ],
+  "final_text": "INV-2050 is EUR 1000, above the EUR 500 threshold, so it needs approver sign-off before anything is posted. Approval requested.",
+  "error": null
+}

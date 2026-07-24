@@ -78,7 +78,7 @@ def make_run_report(verdict="PASS", entries=None):
         "total": len(entries),
         "slo": {
             "p95_latency_ms": {"limit": 2000, "observed": 400.0, "passed": True},
-            "cost_per_invoice_eur": {"limit": 0.08, "max_observed": 0.02, "passed": True},
+            "cost_per_task_eur": {"limit": 0.08, "unit": "invoice", "max_observed": 0.02, "passed": True},
         },
         "verdict": verdict,
     }

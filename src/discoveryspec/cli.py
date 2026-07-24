@@ -232,7 +232,13 @@ def _write_contract_or_exit(out: Path, document: dict, force: bool) -> None:
     # for the same path must not silently truncate each other's artifact
     try:
         out.parent.mkdir(parents=True, exist_ok=True)
-        with out.open("w" if force else "x", encoding="utf-8") as handle:
+        # newline="\n" keeps a contract byte-identical across platforms: these
+        # documents are content-hashed into run reports and compared against
+        # golden artifacts, so a CRLF translation on Windows would make the same
+        # contract hash differently there than in CI
+        with out.open(
+            "w" if force else "x", encoding="utf-8", newline="\n"
+        ) as handle:
             handle.write(json.dumps(document, indent=2, ensure_ascii=False) + "\n")
     except FileExistsError:
         _refuse_existing_out(out)
@@ -403,6 +409,15 @@ def _print_report(report: ValidationReport, contract) -> None:
             turns = ", ".join(f"T{n:02d}" for n in req.source_turns) or "follow-up"
             typer.echo(f"  {req_id} [{turns}] {req.stakeholder}: {req.title}")
 
+    if report.untestable_requirements:
+        typer.echo(
+            f"\nNO ACCEPTANCE RULE ({len(report.untestable_requirements)}) - write one, "
+            f"or record how each is verified out of band:"
+        )
+        for req_id in report.untestable_requirements:
+            req = by_id[req_id]
+            typer.echo(f"  {req_id} ({req.category}) {req.stakeholder}: {req.title}")
+
     if report.errors:
         typer.echo(f"\nSTRUCTURAL ERRORS ({len(report.errors)}):", err=True)
         for error in report.errors:
@@ -418,7 +433,7 @@ def _print_report(report: ValidationReport, contract) -> None:
 
 @app.command()
 def validate(
-    contract: Path = typer.Option(..., help="path to a deployment-contract.v1 JSON file"),
+    contract: Path = typer.Option(..., help="path to a deployment-contract.v2 JSON file"),
     transcript: Optional[Path] = typer.Option(
         None,
         help="transcript to check provenance against; defaults to the file named "
@@ -570,7 +585,7 @@ def compile_cmd(
 @app.command()
 def approve(
     contract: Path = typer.Option(
-        ..., help="path to a fully resolved DRAFT deployment-contract.v1 JSON file"
+        ..., help="path to a fully resolved DRAFT deployment-contract.v2 JSON file"
     ),
     by: str = typer.Option(
         ...,
@@ -674,7 +689,7 @@ def approve(
 
 @app.command("export-gate")
 def export_gate(
-    contract: Path = typer.Option(..., help="path to an APPROVED deployment-contract.v1 JSON file"),
+    contract: Path = typer.Option(..., help="path to an APPROVED deployment-contract.v2 JSON file"),
     transcript: Optional[Path] = typer.Option(
         None,
         help="transcript to check provenance against; defaults to the file named "
@@ -708,6 +723,8 @@ def export_gate(
         scenarios_payload, config_payload = gate_export(loaded, parsed_transcript)
     except CompileError as exc:
         typer.echo(f"export refused: {exc}", err=True)
+        for problem in exc.problems:
+            typer.echo(f"  - {problem}", err=True)
         _remove_stale_artifacts(scenarios_path, config_path)
         raise typer.Exit(code=exc.exit_code)
 
@@ -727,7 +744,7 @@ def export_gate(
 @app.command()
 def run(
     contract: Path = typer.Option(
-        ..., help="path to an APPROVED deployment-contract.v1 JSON file"
+        ..., help="path to an APPROVED deployment-contract.v2 JSON file"
     ),
     transcript: Optional[Path] = typer.Option(
         None,
@@ -760,7 +777,7 @@ def run(
     prices: Optional[Path] = typer.Option(
         None,
         help='EUR price table JSON, {"<model>": {"input_per_mtok": <eur>, '
-        '"output_per_mtok": <eur>}}; required, it verifies the per-invoice '
+        '"output_per_mtok": <eur>}}; required, it verifies the per-task '
         "cost SLO",
     ),
     out: Path = typer.Option(
@@ -786,7 +803,7 @@ def run(
     stale export), executed with agent-eval-gate's own loader, adapters, and
     checks, and every verdict is linked back to the requirement it enforces
     and the numbered customer statements behind it. The contract SLOs are
-    enforced across the run: statistical p95 latency and the per-invoice cost
+    enforced across the run: statistical p95 latency and the per-task cost
     ceiling on every scenario. Fail closed: harness or judge errors exit 2,
     a failing scenario or breached SLO exits 1; there is no non-strict mode.
     """
@@ -836,7 +853,7 @@ def run(
         raise typer.Exit(code=2)
     if prices is None:
         typer.echo(
-            "error: the contract carries a per-invoice cost SLO; pass --prices "
+            "error: the contract carries a per-task cost SLO; pass --prices "
             "with a EUR price table so it can be verified (a run that skips a "
             "promised check proves nothing)",
             err=True,
@@ -863,6 +880,8 @@ def run(
         scenarios_payload, config_payload = gate_export(loaded, parsed_transcript)
     except CompileError as exc:
         typer.echo(f"run refused: {exc}", err=True)
+        for problem in exc.problems:
+            typer.echo(f"  - {problem}", err=True)
         raise typer.Exit(code=exc.exit_code)
 
     try:
@@ -948,13 +967,13 @@ def run(
             for result in results
             if result.trajectory.error is None
         }
-        clerk_facing_ids = {
+        interactive_ids = {
             scenario_id
             for scenario_id, prov in config_payload["scenario_provenance"].items()
-            if prov.get("clerk_facing", True)
+            if prov.get("interactive", True)
         }
         slo_verdict = evaluate_slos(
-            results, costs, config_payload["slo"], clerk_facing_ids
+            results, costs, config_payload["slo"], interactive_ids
         )
     except RunError as exc:
         typer.echo(f"run refused: {exc}", err=True)
@@ -1136,7 +1155,11 @@ def report(
 
     out.parent.mkdir(parents=True, exist_ok=True)
     try:
-        with out.open("w" if force else "x", encoding="utf-8") as handle:
+        # newline="\n" for the same reason as the contract writer: one report,
+        # the same bytes, on every platform that renders it
+        with out.open(
+            "w" if force else "x", encoding="utf-8", newline="\n"
+        ) as handle:
             handle.write(html)
     except FileExistsError:
         _refuse_existing_out(out)

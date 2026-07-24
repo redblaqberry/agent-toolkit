@@ -38,12 +38,12 @@ from .models import DeploymentContract
 from .transcript import Transcript
 from .validate import ValidationReport, validate_contract
 
-CONTRACT_VERSION = "deployment-contract.v1"
-DEFAULT_EXTRACTION_MODEL = "claude-opus-4-8"
+CONTRACT_VERSION = "deployment-contract.v2"
+DEFAULT_EXTRACTION_MODEL = "claude-opus-5"
 
 EXTRACTION_RULES = """\
 You are the extraction stage of DiscoverySpec. You turn a technical discovery
-transcript into a DRAFT deployment-contract.v1 JSON document. You extract; you
+transcript into a DRAFT deployment-contract.v2 JSON document. You extract; you
 never invent, resolve, or decide.
 
 Rules:
@@ -63,11 +63,16 @@ Rules:
 - Executable sections (kpis, roles, allowed_actions, escalation_rules,
   security_constraints, slo, environment, data_governance) may only reference
   requirements with status "resolved".
-- metadata: fill project (kebab-case) and customer from the call; set
-  status "draft", approved_by null, approved_at null, transcript_sha256 null,
-  and transcript to the file name you are given. The pipeline re-stamps this
-  envelope and validates every citation against the transcript; anything
-  unsupported is rejected.
+- Leave acceptance_rules empty. Acceptance rules carry the inputs a test sends
+  the agent and the outcome it must produce; they are authored during human
+  review, once the conflicts are resolved and it is settled what the agent is
+  actually promising. Inventing them here would mean inventing test data.
+- metadata: fill project (kebab-case), system (a human-readable name for the
+  system under test, e.g. "supplier-invoice agent"), and customer from the
+  call; set status "draft", approved_by null, approved_at null,
+  transcript_sha256 null, and transcript to the file name you are given. The
+  pipeline re-stamps this envelope and validates every citation against the
+  transcript; anything unsupported is rejected.
 
 The document must validate against this JSON Schema:
 """
@@ -88,7 +93,7 @@ class ExtractionError(ValueError):
 
 class Extractor(Protocol):
     """An extraction adapter: turns a parsed transcript into a contract-shaped
-    document (a dict in ``deployment-contract.v1`` layout). The result is a
+    document (a dict in ``deployment-contract.v2`` layout). The result is a
     proposal; the compile pipeline validates it and owns the metadata
     envelope."""
 

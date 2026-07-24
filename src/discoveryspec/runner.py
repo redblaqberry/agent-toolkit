@@ -14,7 +14,7 @@ Fail-closed rules, mirroring agent-eval-gate's exit convention:
   because a deploy gate that shrugs at failures gates nothing
 - the contract-level SLOs are enforced here, across the whole run: the p95
   latency ceiling is checked statistically over every interactive step in the
-  run (nearest-rank, per step as the customer stated it), and the per-invoice
+  run (nearest-rank, per step as the customer stated it), and the per-task
   cost ceiling is checked against every scenario's cost.
   A cost SLO that cannot be verified (no price table, unknown model) refuses
   the run instead of skipping the check; cache tokens are priced at the full
@@ -114,7 +114,7 @@ def scenario_cost_eur(trajectory: Any, prices: dict) -> float:
     if table is None:
         raise RunError(
             f"price table has no entry for model {trajectory.model!r}; "
-            f"the per-invoice cost SLO cannot be verified"
+            f"the per-task cost SLO cannot be verified"
         )
     raw_rates = [table.get("input_per_mtok"), table.get("output_per_mtok")]
     if any(isinstance(r, bool) or not isinstance(r, (int, float)) for r in raw_rates):
@@ -212,16 +212,16 @@ def evaluate_slos(
     results: list,
     costs_eur: dict[str, float],
     slo: dict,
-    clerk_facing_ids: Optional[set[str]] = None,
+    interactive_ids: Optional[set[str]] = None,
 ) -> dict:
     """Check the contract-level SLOs across the whole run.
 
     The latency SLO is per interactive STEP, matching the customer's words
     ("p95 under 2 seconds per step", T30), and its population is scoped to
-    the scenarios flagged clerk-facing in the templates: the customer also
-    said bulk extraction and non-interactive flows carry no latency
-    requirement, so a slow approver release must not fail an otherwise
-    compliant SLO. ``clerk_facing_ids=None`` samples every scenario.
+    the scenarios their acceptance rule marks interactive: contracts scope the
+    ceiling to the interactive path, so a slow batch or approver-side flow must
+    not fail an otherwise compliant SLO. ``interactive_ids=None`` samples every
+    scenario.
 
     A negative or non-finite recorded latency is a malformed fixture and
     refuses the run. An SLO with no samples at all (every relevant scenario
@@ -230,7 +230,7 @@ def evaluate_slos(
     """
     latencies_ms = []
     for result in results:
-        if clerk_facing_ids is not None and result.scenario_id not in clerk_facing_ids:
+        if interactive_ids is not None and result.scenario_id not in interactive_ids:
             continue
         for step in result.trajectory.steps:
             if not math.isfinite(step.latency_s) or step.latency_s < 0:
@@ -247,7 +247,7 @@ def evaluate_slos(
     else:
         observed_p95 = None
         latency_passed = False  # unmeasured is never a pass
-    cost_limit = slo["cost_per_invoice_eur"]
+    cost_limit = slo["cost_per_task_eur"]
     max_cost = max(costs_eur.values()) if costs_eur else None
     return {
         "p95_latency_ms": {
@@ -255,8 +255,11 @@ def evaluate_slos(
             "observed": observed_p95,
             "passed": latency_passed,
         },
-        "cost_per_invoice_eur": {
+        "cost_per_task_eur": {
             "limit": cost_limit,
+            # the ceiling is per unit of work, so the number never travels
+            # without the noun it is per
+            "unit": slo.get("task_unit", "task"),
             "max_observed": round(max_cost, 6) if max_cost is not None else None,
             "passed": max_cost is not None and max_cost <= cost_limit,
         },
@@ -373,6 +376,9 @@ def provenance_report(
         "passed": passed_count,
         "total": len(results),
         "slo": slo_verdict,
+        # promises this suite deliberately does not check, carried into the run
+        # record so a clean verdict can never be read as broader than it is
+        "not_covered": list(config_payload.get("not_covered", [])),
         "verdict": verdict,
     }
 
@@ -412,7 +418,7 @@ def console_lines(report: dict) -> list[str]:
                 )
     slo = report["slo"]
     latency = slo["p95_latency_ms"]
-    cost = slo["cost_per_invoice_eur"]
+    cost = slo["cost_per_task_eur"]
     latency_observed = (
         f"{latency['observed']} ms" if latency["observed"] is not None
         else "not measured"
@@ -423,11 +429,16 @@ def console_lines(report: dict) -> list[str]:
     )
     lines += [
         "-" * 78,
-        f"SLO p95 latency (clerk-facing steps): {latency_observed} observed / "
+        f"SLO p95 latency (interactive steps): {latency_observed} observed / "
         f"{latency['limit']} ms ceiling -> {'PASS' if latency['passed'] else 'FAIL'}",
-        f"SLO cost per invoice: {cost_observed} max observed / "
+        f"SLO cost per {cost.get('unit', 'task')}: {cost_observed} max observed / "
         f"EUR {cost['limit']} ceiling -> {'PASS' if cost['passed'] else 'FAIL'}",
         f"verdict: {report['verdict']} "
         f"({report['passed']}/{report['total']} scenarios)",
     ]
+    for entry in report.get("not_covered", []):
+        lines.append(
+            f"not covered by this suite: {entry['requirement_id']} "
+            f"({entry['title']}), verified by {entry['verified_by']}"
+        )
     return lines

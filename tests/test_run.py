@@ -117,7 +117,7 @@ def test_run_replay_all_pass(tmp_path, scenarios, transcript):
     assert report["verdict"] == "PASS"
     assert report["passed"] == report["total"] == 10
     assert report["slo"]["p95_latency_ms"]["passed"]
-    assert report["slo"]["cost_per_invoice_eur"]["passed"]
+    assert report["slo"]["cost_per_task_eur"]["passed"]
     for entry in report["scenarios"]:
         assert entry["manager_label"].strip() and entry["manager_label"] != entry["scenario_id"]
         assert entry["enforces"]["requirement_id"].startswith("REQ-")
@@ -249,7 +249,7 @@ def test_run_cost_slo_breach_is_exit_1(tmp_path, scenarios):
     report = json.loads(
         (tmp_path / "run-out" / "run-report.json").read_text(encoding="utf-8")
     )
-    assert not report["slo"]["cost_per_invoice_eur"]["passed"]
+    assert not report["slo"]["cost_per_task_eur"]["passed"]
 
 
 # --- fail-closed refusals -------------------------------------------------------
@@ -298,7 +298,7 @@ def test_run_rejects_unknown_mode(tmp_path):
     assert "--mode must be replay or live" in combined(result)
 
 
-def test_slow_non_clerk_facing_step_does_not_fail_the_slo(tmp_path, scenarios):
+def test_slow_non_interactive_step_does_not_fail_the_slo(tmp_path, scenarios):
     # the customer scoped the latency SLO to clerk-facing steps; a slow
     # approver release must not contaminate the p95 population
     target = next(s for s in scenarios if s.id == "posting-only-after-named-approval")

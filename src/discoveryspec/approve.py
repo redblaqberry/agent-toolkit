@@ -119,6 +119,12 @@ def approve_contract(
             f"adopted but not wired into any executable section: {req_id} "
             f"({req.stakeholder}: {req.title})"
         )
+    for req_id in report.untestable_requirements:
+        req = by_id[req_id]
+        blockers.append(
+            f"no acceptance rule and no recorded out-of-band verification: {req_id} "
+            f"({req.stakeholder}: {req.title})"
+        )
     if blockers:
         raise ApprovalError(
             "the discovery review is not finished; resolve these before sign-off",

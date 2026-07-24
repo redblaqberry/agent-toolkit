@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .models import DeploymentContract, Requirement
+from .models import BEHAVIORAL_CATEGORIES, DeploymentContract, Requirement
 from .transcript import Transcript
 
 
@@ -29,6 +29,7 @@ class ValidationReport:
     open_nonblocking_questions: list[str] = field(default_factory=list)
     pending_fields: list[str] = field(default_factory=list)
     unwired_requirements: list[str] = field(default_factory=list)
+    untestable_requirements: list[str] = field(default_factory=list)
     provenance_verified: bool = False  # True only when a transcript was checked
 
     @property
@@ -260,16 +261,78 @@ def validate_contract(
         )
     if contract.slo.p95_latency_ms is not None:
         check_ref("slo.p95_latency_ms", contract.slo.p95_latency_ms.requirement_id, {"latency"})
-    if contract.slo.cost_per_invoice_eur is not None:
+    if contract.slo.cost_per_task_eur is not None:
         check_ref(
-            "slo.cost_per_invoice_eur",
-            contract.slo.cost_per_invoice_eur.requirement_id,
+            "slo.cost_per_task_eur",
+            contract.slo.cost_per_task_eur.requirement_id,
             {"cost"},
         )
     if contract.environment is not None:
         check_ref("environment", contract.environment.requirement_id, {"environment"})
     if contract.data_governance is not None:
         check_ref("data_governance", contract.data_governance.requirement_id, {"data"})
+
+    # --- acceptance rules ---------------------------------------------------
+    rule_ids: set[str] = set()
+    slugs: set[str] = set()
+    for rule in contract.acceptance_rules:
+        if rule.id in rule_ids:
+            errors.append(f"duplicate acceptance rule id {rule.id}")
+        rule_ids.add(rule.id)
+        if rule.slug in slugs:
+            errors.append(f"duplicate acceptance rule slug {rule.slug!r}")
+        slugs.add(rule.slug)
+
+        req = by_id.get(rule.requirement_id)
+        if req is None:
+            errors.append(
+                f"{rule.id}: enforces unknown requirement {rule.requirement_id}"
+            )
+        else:
+            if req.status != "resolved":
+                errors.append(
+                    f"{rule.id}: enforces {req.id} whose status is {req.status}; "
+                    f"only a resolved requirement can be tested"
+                )
+            if req.resolution is not None and req.resolution.decision == "rejected":
+                errors.append(
+                    f"{rule.id}: enforces {req.id}, which was resolved as REJECTED; "
+                    f"a rejected requirement is not a promise to test"
+                )
+            if req.out_of_band_verification is not None:
+                errors.append(
+                    f"{rule.id}: enforces {req.id}, which is recorded as verified "
+                    f"out of band; a requirement is either checked by the suite or "
+                    f"checked elsewhere, never claimed as both"
+                )
+        for cited in rule.cites:
+            if cited not in by_id:
+                errors.append(f"{rule.id}: cites unknown requirement {cited}")
+
+        named_actions = (
+            [a.name for a in rule.expect.actions]
+            + list(rule.expect.forbidden_actions)
+            + list(rule.expect.max_action_calls)
+        )
+        for action in named_actions:
+            if action not in action_names:
+                errors.append(
+                    f"{rule.id}: names action {action!r}, which is not in the "
+                    f"contract's allowed_actions"
+                )
+        if rule.expect.is_empty() and not rule.rubric:
+            # a scenario that checks nothing cannot fail, so exporting it would
+            # add a passing row to the report that proves nothing at all
+            errors.append(
+                f"{rule.id}: has no observable outcome (no expected or forbidden "
+                f"actions, no output constraints, no rubric); a rule that cannot "
+                f"fail is not a test"
+            )
+        if rule.type == "latency" and rule.max_steps is None:
+            errors.append(
+                f"{rule.id}: a latency rule needs max_steps, because the per-step "
+                f"ceiling is what the SLO states"
+            )
 
     # --- findings -----------------------------------------------------------
     report.conflict_groups = _conflict_groups(requirements)
@@ -281,8 +344,8 @@ def validate_contract(
     ]
     if contract.slo.p95_latency_ms is None:
         report.pending_fields.append("slo.p95_latency_ms")
-    if contract.slo.cost_per_invoice_eur is None:
-        report.pending_fields.append("slo.cost_per_invoice_eur")
+    if contract.slo.cost_per_task_eur is None:
+        report.pending_fields.append("slo.cost_per_task_eur")
     if contract.environment is None:
         report.pending_fields.append("environment")
     if contract.data_governance is None:
@@ -301,6 +364,22 @@ def validate_contract(
         if req.status == "resolved"
         and not (req.resolution is not None and req.resolution.decision == "rejected")
         and req.id not in referenced
+    ]
+
+    # Coverage of the acceptance suite, in the same spirit: a requirement that
+    # describes agent behavior must either carry an acceptance rule or say, on
+    # the record, that it cannot be checked by a trajectory and who checks it
+    # instead. Silence is the failure mode; a promise nobody wrote a test for
+    # and nobody excused is a promise the gate will pass without ever touching.
+    ruled = contract.rules_by_requirement()
+    report.untestable_requirements = [
+        req.id
+        for req in requirements
+        if req.category in BEHAVIORAL_CATEGORIES
+        and req.status == "resolved"
+        and not (req.resolution is not None and req.resolution.decision == "rejected")
+        and req.id not in ruled
+        and req.out_of_band_verification is None
     ]
 
     # --- approval gate: no unreviewed contract can run -----------------------
@@ -333,6 +412,13 @@ def validate_contract(
                 f"approved contract adopts requirements that no executable section "
                 f"references: {report.unwired_requirements}; an adopted promise must "
                 f"be wired into the contract or resolved as rejected, never dropped"
+            )
+        if report.untestable_requirements:
+            approval.append(
+                f"approved contract has behavioral requirements with neither an "
+                f"acceptance rule nor a recorded out-of-band verification: "
+                f"{report.untestable_requirements}; the suite would pass without "
+                f"ever checking them"
             )
 
     return report

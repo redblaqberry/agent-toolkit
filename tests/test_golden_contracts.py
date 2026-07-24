@@ -35,7 +35,7 @@ def test_success_metric_blocking_unknown_surfaces(transcript):
 def test_draft_reports_pending_required_fields(transcript):
     contract = load_contract(DRAFT_PATH)
     report = validate_contract(contract, transcript)
-    assert set(report.pending_fields) == {"slo.cost_per_invoice_eur", "data_governance"}
+    assert set(report.pending_fields) == {"slo.cost_per_task_eur", "data_governance"}
 
 
 def test_draft_provenance_resolves_against_transcript(transcript):
@@ -90,7 +90,7 @@ def test_approved_contract_forbids_autonomous_posting():
 
 def test_approved_thresholds_match_resolutions():
     contract = load_contract(APPROVED_PATH)
-    assert contract.slo.cost_per_invoice_eur.value == 0.08
+    assert contract.slo.cost_per_task_eur.value == 0.08
     threshold_rule = next(
         r for r in contract.escalation_rules if r.requirement_id == "REQ-007"
     )

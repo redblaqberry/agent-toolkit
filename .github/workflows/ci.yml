@@ -52,8 +52,22 @@ jobs:
       - name: Install agent-eval-gate
         run: uv pip install "git+https://github.com/redblaqberry/agent-eval-gate"
       - run: uv run pytest -q
-      - name: Export the acceptance suite from the approved contract
+      - name: Full pipeline, both bundled domains
         run: |
+          uv run discoveryspec validate --require-approved \
+            --contract examples/invoice_automation/approved-contract.json
           uv run discoveryspec export-gate \
-            --contract examples/invoice_automation/approved-contract.json \
+            --contract examples/refund_handling/approved-contract.json \
             --out ci-export
+          uv run discoveryspec run \
+            --contract examples/invoice_automation/approved-contract.json \
+            --mode replay --fixtures examples/invoice_automation/fixtures \
+            --prices examples/prices.json --out ci-run
+          uv run discoveryspec report \
+            --contract examples/invoice_automation/approved-contract.json \
+            --run ci-run --brand examples/brands/nordlicht-strict.json \
+            --out ci-report.html
+          uv run discoveryspec run \
+            --contract examples/refund_handling/approved-contract.json \
+            --mode replay --fixtures examples/refund_handling/fixtures \
+            --prices examples/prices.json --out ci-run-refund

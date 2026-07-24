@@ -1,0 +1,43 @@
+{
+  "scenario_id": "interactive-lookup-latency-budget",
+  "model": "claude-sonnet-5",
+  "steps": [
+    {
+      "index": 0,
+      "stop_reason": "tool_use",
+      "text": "",
+      "tool_calls": [
+        {
+          "name": "read_order",
+          "args": {
+            "order_id": "ORD-88127"
+          },
+          "result": "ok",
+          "is_error": false
+        }
+      ],
+      "usage": {
+        "input_tokens": 1500,
+        "output_tokens": 90,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      },
+      "latency_s": 0.42
+    },
+    {
+      "index": 1,
+      "stop_reason": "end_turn",
+      "text": "ORD-88127 was delivered on 2026-02-24 for EUR 74.90.",
+      "tool_calls": [],
+      "usage": {
+        "input_tokens": 1900,
+        "output_tokens": 160,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      },
+      "latency_s": 0.81
+    }
+  ],
+  "final_text": "ORD-88127 was delivered on 2026-02-24 for EUR 74.90.",
+  "error": null
+}

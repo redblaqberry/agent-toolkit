@@ -16,7 +16,7 @@ from pydantic import ValidationError
 
 from .models import DeploymentContract
 
-SCHEMA_RESOURCE = "deployment-contract.v1.schema.json"
+SCHEMA_RESOURCE = "deployment-contract.v2.schema.json"
 
 
 class ContractLoadError(ValueError):

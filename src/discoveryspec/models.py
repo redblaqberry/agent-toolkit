@@ -1,12 +1,20 @@
-"""deployment-contract.v1: the data model.
+"""deployment-contract.v2: the data model.
 
 A contract is only executable through its requirements: every KPI, role,
 action, escalation rule, security constraint, SLO, environment, and
 data-governance entry references a requirement id, and every requirement
 traces to numbered transcript turns or an explicitly recorded follow-up.
-The canonical JSON Schema lives in ``schemas/deployment-contract.v1.schema.json``;
+The canonical JSON Schema lives in ``schemas/deployment-contract.v2.schema.json``;
 these models mirror it field for field, including which keys are mandatory,
 so the model and the schema accept the same documents.
+
+v2 supersedes v1, which had no released consumers. It adds ``acceptance_rules``
+(the typed primitives the acceptance suite is compiled from, replacing
+domain-bound scenario templates), ``requirements[].out_of_band_verification``
+(the explicit record that a promise is not checkable by an agent trajectory and
+how it is verified instead), and ``metadata.system``; and it renames the cost
+SLO from ``cost_per_invoice_eur`` to ``cost_per_task_eur`` with an explicit
+``unit``, because a deployment contract is not an invoicing document.
 
 Namespaces: ``roles[].permissions`` are human-side capabilities inside the
 customer workflow; ``allowed_actions[].action`` is the exhaustive allowlist of
@@ -23,7 +31,9 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 REQ_ID_PATTERN = r"^REQ-[0-9]{3}$"
 UNK_ID_PATTERN = r"^UNK-[0-9]{3}$"
+RULE_ID_PATTERN = r"^RULE-[0-9]{3}$"
 NAME_PATTERN = r"^[a-z][a-z0-9_]*$"
+SLUG_PATTERN = r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
 DATE_PATTERN = r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
 SHA256_PATTERN = r"^[a-f0-9]{64}$"
 
@@ -55,6 +65,22 @@ class Resolution(StrictModel):
     date: DateStr
 
 
+class OutOfBandVerification(StrictModel):
+    """Why a promise cannot be checked by an agent trajectory, and what does
+    check it instead.
+
+    Some commitments are real and load-bearing but simply not observable in a
+    tool-call trace: data residency is a property of where the system is hosted,
+    an append-only audit log is a property of the logging backend. Writing a
+    scenario for them would produce a test that passes without proving
+    anything. Recording them here instead keeps them visible: the acceptance
+    suite states what it does not cover, and who signed off on covering it.
+    """
+
+    reason: str = Field(min_length=1)
+    verified_by: str = Field(min_length=1)
+
+
 class Requirement(StrictModel):
     id: str = Field(pattern=REQ_ID_PATTERN)
     title: str = Field(min_length=1)
@@ -66,6 +92,7 @@ class Requirement(StrictModel):
     status: Literal["resolved", "conflict"]
     conflicts_with: list[ReqId] = Field(default_factory=list)
     resolution: Optional[Resolution] = None
+    out_of_band_verification: Optional[OutOfBandVerification] = None
 
 
 class QuestionResolution(StrictModel):
@@ -126,12 +153,16 @@ class LatencySlo(StrictModel):
 
 class CostSlo(StrictModel):
     value: float = Field(gt=0, allow_inf_nan=False)
+    # what one unit of work is in this deployment ("invoice", "refund
+    # request"). The ceiling is per unit, and the manager report names it, so
+    # the number is never presented without saying what it is per.
+    unit: str = Field(min_length=1)
     requirement_id: ReqId
 
 
 class Slo(StrictModel):
     p95_latency_ms: Optional[LatencySlo]
-    cost_per_invoice_eur: Optional[CostSlo]
+    cost_per_task_eur: Optional[CostSlo]
 
 
 class Environment(StrictModel):
@@ -147,8 +178,83 @@ class DataGovernance(StrictModel):
     requirement_id: ReqId
 
 
+class ExpectedAction(StrictModel):
+    name: Name
+    args_subset: dict = Field(default_factory=dict)
+
+
+class Expectation(StrictModel):
+    """The observable outcome of one acceptance rule.
+
+    Everything here is checked deterministically against the recorded
+    trajectory. A rule whose expectation is empty and that carries no rubric
+    has no observable outcome at all, and the compiler refuses it rather than
+    exporting a scenario that cannot fail.
+    """
+
+    actions: list[ExpectedAction] = Field(default_factory=list)
+    actions_ordered: bool = False
+    forbidden_actions: list[Name] = Field(default_factory=list)
+    max_action_calls: dict[Name, int] = Field(default_factory=dict)
+    output_contains: list[str] = Field(default_factory=list)
+    output_excludes: list[str] = Field(default_factory=list)
+
+    def is_empty(self) -> bool:
+        return not (
+            self.actions
+            or self.forbidden_actions
+            or self.max_action_calls
+            or self.output_contains
+            or self.output_excludes
+        )
+
+
+RuleType = Literal[
+    "required_action",   # the agent must take these actions
+    "forbidden_action",  # the agent must never take these actions
+    "escalation",        # under a stated condition, the agent must hand off
+    "latency",           # exercises the interactive path the latency SLO covers
+    "cost",              # exercises the path the per-task cost ceiling covers
+]
+
+
+class AcceptanceRule(StrictModel):
+    """One typed, domain-independent acceptance primitive.
+
+    A rule is the contract's own statement of how a requirement is checked:
+    the situation, the input to send, and the outcome that must be observable.
+    The compiler renders rules into gate scenarios mechanically, so the suite
+    is a function of the contract rather than of a template that happens to
+    know this customer's requirement ids.
+    """
+
+    id: str = Field(pattern=RULE_ID_PATTERN)
+    slug: str = Field(pattern=SLUG_PATTERN)
+    type: RuleType
+    requirement_id: ReqId
+    # further requirements this rule cites for provenance only, typically the
+    # rejected side of a resolved conflict; unlike requirement_id they may be
+    # rejected, because the point is to show what was decided against
+    cites: list[ReqId] = Field(default_factory=list)
+    label: str = Field(min_length=1)  # plain language, for the manager report
+    # the Given/When/Then the exported scenario carries as its description
+    given: str = Field(min_length=1)
+    when: str = Field(min_length=1)
+    then: str = Field(min_length=1)
+    message: str = Field(min_length=1)  # sent verbatim to the agent under test
+    # whether this exercises the interactive path the p95 latency SLO applies
+    # to; batch and approver-side flows are excluded from that population
+    interactive: bool = True
+    expect: Expectation = Field(default_factory=Expectation)
+    rubric: list[str] = Field(default_factory=list)
+    max_steps: Optional[int] = Field(default=None, ge=1)
+
+
 class Metadata(StrictModel):
     project: str = Field(min_length=1)
+    # human-readable name of the system under test, used wherever a document is
+    # written for people ("supplier-invoice agent"); project stays the slug
+    system: str = Field(min_length=1)
     customer: str = Field(min_length=1)
     transcript: str = Field(min_length=1)
     transcript_sha256: Optional[Annotated[str, Field(pattern=SHA256_PATTERN)]]
@@ -162,7 +268,7 @@ class Metadata(StrictModel):
 
 
 class DeploymentContract(StrictModel):
-    contract_version: Literal["deployment-contract.v1"]
+    contract_version: Literal["deployment-contract.v2"]
     metadata: Metadata
     requirements: list[Requirement] = Field(min_length=1)
     open_questions: list[OpenQuestion]
@@ -174,6 +280,24 @@ class DeploymentContract(StrictModel):
     slo: Slo
     environment: Optional[Environment]
     data_governance: Optional[DataGovernance]
+    acceptance_rules: list[AcceptanceRule] = Field(default_factory=list)
 
     def requirement_by_id(self) -> dict[str, Requirement]:
         return {r.id: r for r in self.requirements}
+
+    def rules_by_requirement(self) -> dict[str, list[AcceptanceRule]]:
+        index: dict[str, list[AcceptanceRule]] = {}
+        for rule in self.acceptance_rules:
+            index.setdefault(rule.requirement_id, []).append(rule)
+        return index
+
+
+# Categories that describe agent behavior, and can therefore be checked by an
+# acceptance suite that observes a trajectory. The others are contract facts:
+# a KPI is measured in production over time, roles and environments are
+# configuration, and data governance is a hosting and retention property. Only
+# these five have to carry an acceptance rule or an explicit out-of-band
+# verification record before a contract can produce a suite.
+BEHAVIORAL_CATEGORIES = frozenset(
+    {"allowed_action", "escalation", "security", "latency", "cost"}
+)
