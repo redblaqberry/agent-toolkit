@@ -5,8 +5,8 @@ claim, never as a fact. The pipeline around it owns the trust envelope and
 enforces it regardless of what the adapter returns:
 
 - a compiled contract is ALWAYS an unsigned draft; ``status``,
-  ``approved_by``, and ``approved_at`` are forced, so no extractor can mint
-  an approved contract
+  ``approved_by``, ``approved_at``, and ``approval_signature`` are forced, so
+  no extractor can mint an approved contract or hand back an attestation
 - the transcript name and SHA-256 pin are stamped from the transcript that
   was actually parsed, not from anything the extractor says
 - the assembled document must pass the full pipeline (JSON Schema, model,
@@ -278,6 +278,12 @@ def compile_contract(
     metadata["status"] = "draft"
     metadata["approved_by"] = None
     metadata["approved_at"] = None
+    # no adapter may hand back an attestation: only approve --signing-key
+    # produces one, and a draft carrying a signature would be a document this
+    # pipeline never signed but that looks signed to anything reading the field.
+    # Dropped rather than nulled, so a clean extraction is byte-identical to a
+    # draft that never mentioned the field.
+    metadata.pop("approval_signature", None)
 
     source = f"<{extractor.name} extraction>"
     try:

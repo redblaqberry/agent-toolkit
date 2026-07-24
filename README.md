@@ -16,6 +16,7 @@ transcript.md -> draft contract -> human approval -> contract JSON
 The contract is only executable through its requirements:
 
 - Every KPI, role, action, escalation rule, security constraint, SLO, and data-governance entry references a requirement id.
+- The reverse direction is checked too, because that is where promises actually get lost: a requirement that came out of review adopted, but that no executable section references, is a commitment the deployment would silently drop. An approved contract carrying one is refused, and `approve` will not stamp it. Requirements still in open conflict are exempt (which side gets wired in is exactly what resolving them decides), and a rejected one must never be wired.
 - Every requirement cites the numbered transcript turns it was extracted from, or an explicitly recorded follow-up. This is positional traceability: the tool verifies the cited turns exist in the pinned transcript, not that they semantically support the requirement. Confirming that each requirement faithfully reflects its cited turns is the job of the human approval step, which is what the sign-off attests to.
 - The contract pins the SHA-256 of the exact transcript bytes its provenance came from; validating against a different transcript fails, and a contract cannot be approved without the pin.
 - `approve --signing-key` cryptographically attests the approval with an Ed25519 signature over a canonical digest of the whole contract; `validate`/`export-gate`/`run`/`report --verify-key` then require a valid signature, so editing any byte (including the approver names or `status`) after signing fails the gate. The trust boundary is stated plainly: this protects against anyone who does not hold the signing key, under a single approval-authority model. Per-approver identities, threshold signatures, and an attestation registry are roadmap. Without a verify key, validation is structural only and cannot prove authentic approval.
@@ -60,12 +61,12 @@ Exit codes are fail closed:
 | Code | Meaning |
 |---|---|
 | 0 | structurally valid; draft findings (conflicts, open questions, pending fields) are reported, they are the product working |
-| 1 | approval violation: the contract claims approved but has open conflicts, blocking questions, missing sign-off, no transcript pin, or unfilled required fields; also returned for a draft under `--require-approved` |
+| 1 | approval violation: the contract claims approved but has open conflicts, blocking questions, missing sign-off, no transcript pin, unfilled required fields, or an adopted requirement wired into nothing; also returned for a draft under `--require-approved` |
 | 2 | structural failure: schema or model violation, broken provenance, transcript mismatch, dangling references |
 
 For CI and deploy gates, `--require-approved` makes exit 0 possible only for an approved, clean contract, so a draft can never pass a pipeline.
 
-The bundled draft is itself the output of the `compile` pipeline. `compile` runs an extraction adapter over the transcript and owns the trust envelope around whatever the adapter returns: the result is always an unsigned draft, pinned to the SHA-256 of the parsed transcript, and validated end to end (including turn provenance) before anything is written, so an extraction that cites turns that do not exist is refused, and no adapter can mint an approved contract. The `stub` adapter replays a recorded extraction result, which keeps the whole compile-approve-export-run pipeline deterministic and testable without model access; the `claude` adapter extracts live with one structured model call (`pip install 'discoveryspec[llm]'` and SDK credentials in the environment), and its output receives exactly the same distrust.
+The bundled draft is itself the output of the `compile` pipeline. `compile` runs an extraction adapter over the transcript and owns the trust envelope around whatever the adapter returns: the result is always an unsigned draft, pinned to the SHA-256 of the parsed transcript, and validated end to end (including turn provenance) before anything is written, so an extraction that cites turns that do not exist is refused, and no adapter can mint an approved contract or hand back an attestation it did not have the key to produce. The `stub` adapter replays a recorded extraction result, which keeps the whole compile-approve-export-run pipeline deterministic and testable without model access; the `claude` adapter extracts live with one structured model call (`pip install 'discoveryspec[llm]'` and SDK credentials in the environment), and its output receives exactly the same distrust.
 
 ```bash
 discoveryspec compile --transcript examples/invoice_automation/transcript.md \
@@ -77,15 +78,22 @@ discoveryspec compile --transcript examples/invoice_automation/transcript.md \
   --extractor claude --out draft-contract.json
 ```
 
-Once every conflict is resolved, every blocking question answered, and every required field filled, `approve` records the human sign-off:
+Once every conflict is resolved, every blocking question answered, and every required field filled, `approve` records the human sign-off. The signed workflow runs on one Ed25519 key pair, which `keygen` produces:
 
 ```bash
+discoveryspec keygen --out approval-key
+# private key -> approval-key.pem  (secret; never commit it)
+# public key  -> approval-key.pub
+# fingerprint: a29f6e2b032b7042
+
 discoveryspec approve --contract resolved-draft.json \
   --by "Anna Lindqvist (Operations), Jonas Weber (Security), Priya Nair (Finance)" \
   --out approved-contract.json --signing-key approval-key.pem
 ```
 
-`approve` is the intended way a contract gains `status: approved`. It refuses a draft with open conflicts, blocking questions, or pending fields (exit 1), refuses to re-stamp an existing sign-off, and never silently overwrites an output file. On success it pins the SHA-256 of the verified transcript, changes nothing outside `metadata`, and re-validates the stamped document end to end before writing it, so its output always passes `validate --require-approved`. With `--signing-key` it also attests the approval cryptographically; a downstream gate that runs `validate --require-approved --verify-key approval-key.pub` then rejects any contract whose `status` was flipped to `approved` by hand, because structural validation alone cannot tell an authentic approval from an edited one.
+`keygen` writes the private key owner-readable where the platform enforces file modes, and refuses to overwrite an existing pair without `--force`, because replacing a key silently invalidates every contract and run report ever signed with it. The private key is the whole trust anchor: whoever holds it can mint approvals that every downstream gate accepts, so it stays out of the repository and only the `.pub` is handed around.
+
+`approve` is the intended way a contract gains `status: approved`. It refuses a draft with open conflicts, blocking questions, pending fields, or an adopted requirement wired into nothing (exit 1), refuses to re-stamp an existing sign-off, refuses a draft that already carries an attestation (approve is what signs, so a signature on an unapproved document did not come from this pipeline), and never silently overwrites an output file. On success it pins the SHA-256 of the verified transcript, changes nothing outside `metadata`, and re-validates the stamped document end to end before writing it, so its output always passes `validate --require-approved`. With `--signing-key` it also attests the approval cryptographically; a downstream gate that runs `validate --require-approved --verify-key approval-key.pub` then rejects any contract whose `status` was flipped to `approved` by hand, because structural validation alone cannot tell an authentic approval from an edited one.
 
 Then compile the acceptance suite:
 
@@ -121,7 +129,7 @@ One self-contained HTML page for a non-technical decision maker: the verdict up 
 
 ## Status and roadmap
 
-Implemented: transcript parser (numbered turns, strict format, SHA-256 capture), `deployment-contract.v1` JSON Schema plus mirrored Pydantic models, the fail-closed validator, the `validate` CLI, the `compile` pipeline with its extraction-adapter interface, the deterministic stub adapter, and the structured Claude adapter, the `approve` sign-off command, the `export-gate` scenario compiler (ten Given/When/Then acceptance scenarios, each linked to transcript turn ids and requirement ids), the `run` command with replay and live modes and run-level SLO enforcement, the `report` renderer with the brand.v1 policy system, golden contracts, example brand files, and a 217-test suite that includes loading the export with agent-eval-gate's own scenario loader and executing the full suite through its checks. The original bar, 10/10 runnable scenarios retaining requirement and transcript provenance with all three seeded conflicts surfaced before execution, is enforced by tests.
+Implemented: transcript parser (numbered turns, strict format, SHA-256 capture), `deployment-contract.v1` JSON Schema plus mirrored Pydantic models, the fail-closed validator, the `validate` CLI, the `compile` pipeline with its extraction-adapter interface, the deterministic stub adapter, and the structured Claude adapter, the `approve` sign-off command, the `export-gate` scenario compiler (ten Given/When/Then acceptance scenarios, each linked to transcript turn ids and requirement ids), the `run` command with replay and live modes and run-level SLO enforcement, the `report` renderer with the brand.v1 policy system, `keygen` for the approval key pair, golden contracts, example brand files, and a 237-test suite that includes loading the export with agent-eval-gate's own scenario loader and executing the full suite through its checks. The original bar, 10/10 runnable scenarios retaining requirement and transcript provenance with all three seeded conflicts surfaced before execution, is enforced by tests.
 
 Roadmap: recorded live trajectory fixtures for the bundled example (so the replay run in CI exercises real model behavior, not synthetic trajectories) and judge calibration for the rubric scenarios.
 

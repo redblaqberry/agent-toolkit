@@ -2,7 +2,8 @@
 
 Current surface: ``validate``, ``compile``, ``approve``, ``export-gate``,
 ``run``, and ``report``, the full pipeline from transcript to provenance-linked
-gate verdicts and a brand-governed manager report.
+gate verdicts and a brand-governed manager report, plus ``keygen`` for the
+Ed25519 approval key the signed workflow runs on.
 
 Exit codes (fail closed, same convention as agent-eval-gate):
   0  structurally valid; draft findings (conflicts, open questions, pending
@@ -34,8 +35,10 @@ from .approve import ApprovalError, approve_contract
 from .attest import (
     AttestationError,
     contract_has_signature,
+    generate_keypair,
     load_private_key,
     load_public_key,
+    public_key_fingerprint,
     run_has_signature,
     sign_contract,
     sign_run,
@@ -389,6 +392,16 @@ def _print_report(report: ValidationReport, contract) -> None:
 
     if report.pending_fields:
         typer.echo(f"\npending fields: {', '.join(report.pending_fields)}")
+
+    if report.unwired_requirements:
+        typer.echo(
+            f"\nADOPTED BUT NOT WIRED IN ({len(report.unwired_requirements)}) - "
+            f"every one is a promise the deployment does not keep:"
+        )
+        for req_id in report.unwired_requirements:
+            req = by_id[req_id]
+            turns = ", ".join(f"T{n:02d}" for n in req.source_turns) or "follow-up"
+            typer.echo(f"  {req_id} [{turns}] {req.stakeholder}: {req.title}")
 
     if report.errors:
         typer.echo(f"\nSTRUCTURAL ERRORS ({len(report.errors)}):", err=True)
@@ -1142,6 +1155,93 @@ def report(
         f"style: {brand_config.identity.company} "
         f"(shadows {'allowed' if brand_config.policy.allow_shadows else 'forbidden'}, "
         f"corner radius max {brand_config.policy.max_corner_radius_px}px)"
+    )
+    raise typer.Exit(code=0)
+
+
+@app.command()
+def keygen(
+    out: Path = typer.Option(
+        ...,
+        help="path prefix for the key pair; writes <out>.pem (private key) and "
+        "<out>.pub (public key)",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="replace an existing key pair at this path; everything signed with "
+        "the old key stops verifying",
+    ),
+) -> None:
+    """Generate the Ed25519 key pair the signed workflow runs on.
+
+    Writes an unencrypted PKCS8 private key to ``<out>.pem``, created
+    owner-readable where the platform enforces file modes, and the matching
+    public key to ``<out>.pub``. The private key is the entire trust anchor of
+    this pipeline: whoever holds it can mint approvals that every downstream
+    gate accepts. Keep it out of the repository and hand out only the ``.pub``.
+    """
+    import os
+
+    private_path = out.parent / (out.name + ".pem")
+    public_path = out.parent / (out.name + ".pub")
+
+    existing = [str(p) for p in (private_path, public_path) if p.exists()]
+    if existing and not force:
+        typer.echo(
+            f"error: {', '.join(existing)} already exists; refusing to replace a "
+            f"signing key, because every contract and run report signed with it "
+            f"would stop verifying. Choose another --out, or pass --force if the "
+            f"existing key is genuinely retired.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+    private_pem, public_pem = generate_keypair()
+    try:
+        private_path.parent.mkdir(parents=True, exist_ok=True)
+        # exclusive create with an owner-only mode: a private key must never be
+        # written world-readable, and a check-then-write would leave a window
+        # for a hostile file to be pre-created at this path
+        flags = os.O_WRONLY | os.O_CREAT | (os.O_TRUNC if force else os.O_EXCL)
+        handle = os.open(private_path, flags, 0o600)
+        try:
+            os.write(handle, private_pem)
+        finally:
+            os.close(handle)
+    except FileExistsError:
+        _refuse_existing_out(private_path)
+    except OSError as exc:
+        typer.echo(f"error: cannot write {private_path}: {exc}", err=True)
+        raise typer.Exit(code=2)
+
+    try:
+        public_path.write_bytes(public_pem)
+    except OSError as exc:
+        # never leave a private key on disk whose public half is missing: the
+        # operator would have no way to verify what it signs
+        try:
+            private_path.unlink()
+        except OSError:
+            typer.echo(
+                f"error: could not remove {private_path} after the failure; "
+                f"delete it by hand before using this path again",
+                err=True,
+            )
+        typer.echo(f"error: cannot write {public_path}: {exc}", err=True)
+        raise typer.Exit(code=2)
+
+    fingerprint = public_key_fingerprint(load_public_key(public_path))
+    typer.echo(f"private key -> {private_path}  (secret; never commit it)")
+    typer.echo(f"public key  -> {public_path}")
+    typer.echo(f"fingerprint: {fingerprint}")
+    typer.echo(
+        f"sign with:   discoveryspec approve --contract <resolved.json> "
+        f'--by "<approvers>" --out <approved.json> --signing-key {private_path}'
+    )
+    typer.echo(
+        f"verify with: discoveryspec validate --contract <approved.json> "
+        f"--require-approved --verify-key {public_path}"
     )
     raise typer.Exit(code=0)
 

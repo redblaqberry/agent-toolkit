@@ -14,6 +14,7 @@ from discoveryspec import (
     compile_scenarios,
     gate_export,
     load_contract,
+    validate_contract,
 )
 from discoveryspec.cli import app
 from discoveryspec.scenarios import EXPECTED_SCENARIO_COUNT
@@ -195,11 +196,36 @@ def test_draft_contract_is_refused(transcript_module):
         compile_scenarios(draft, transcript_module)
 
 
-def test_missing_escalation_rule_fails_closed(approved_dict, transcript_module):
+def test_dropping_an_escalation_rule_strands_its_requirement(
+    approved_dict, transcript_module
+):
+    # deleting the rule leaves REQ-016 adopted but wired into nothing, which the
+    # validator now refuses before the compiler ever looks for a template: a
+    # promise cannot be deleted from the deployment and keep a clean contract
     approved_dict["escalation_rules"] = [
         r for r in approved_dict["escalation_rules"] if "duplicate" not in r["trigger"]
     ]
     contract = DeploymentContract.model_validate(approved_dict)
+    with pytest.raises(CompileError, match="does not validate cleanly"):
+        compile_scenarios(contract, transcript_module)
+
+    report = validate_contract(contract, transcript_module)
+    assert report.exit_code == 1
+    assert report.unwired_requirements == ["REQ-016"]
+
+
+def test_missing_escalation_rule_fails_closed(approved_dict, transcript_module):
+    # the same deletion, with the stranded requirement removed too, so the
+    # contract is otherwise clean: compilation must still refuse rather than
+    # silently emit fewer scenarios than the suite promises
+    approved_dict["escalation_rules"] = [
+        r for r in approved_dict["escalation_rules"] if "duplicate" not in r["trigger"]
+    ]
+    approved_dict["requirements"] = [
+        r for r in approved_dict["requirements"] if r["id"] != "REQ-016"
+    ]
+    contract = DeploymentContract.model_validate(approved_dict)
+    assert validate_contract(contract, transcript_module).exit_code == 0
     with pytest.raises(CompileError, match="duplicate"):
         compile_scenarios(contract, transcript_module)
 

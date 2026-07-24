@@ -48,6 +48,31 @@ def test_compile_reproduces_golden_draft(tmp_path):
     assert "next: resolve the conflicts" in result.output
 
 
+FORGED_ATTESTATION = {
+    "version": "attest.v1",
+    "kind": "deployment-contract",
+    "algorithm": "ed25519",
+    "public_key_fingerprint": "deadbeefdeadbeef",
+    "digest_sha256": "0" * 64,
+    "signature": "Zm9yZ2Vk",
+}
+
+
+def test_compile_strips_an_attestation_the_extractor_invented(tmp_path):
+    # only approve --signing-key signs. An extraction that hands back an
+    # attestation would otherwise produce a draft that looks signed to anything
+    # reading the field, so the envelope forces it back to None
+    forged = json.loads(DRAFT_PATH.read_text(encoding="utf-8"))
+    forged["metadata"]["approval_signature"] = dict(FORGED_ATTESTATION)
+    out = tmp_path / "draft.json"
+    result = compile_cli(TRANSCRIPT_PATH, write_fixture(tmp_path, forged), out)
+    assert result.exit_code == 0, combined(result)
+    meta = json.loads(out.read_text(encoding="utf-8"))["metadata"]
+    assert meta.get("approval_signature") is None
+    # and the result is byte-identical to a draft that never carried one
+    assert out.read_bytes() == DRAFT_PATH.read_bytes()
+
+
 def test_compile_forces_draft_envelope(tmp_path):
     # an extraction claiming to be approved is stripped back to an unsigned
     # draft: no extractor can mint an approval

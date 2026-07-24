@@ -19,6 +19,72 @@ def validate_dict(data: dict, transcript=None):
     return validate_contract(DeploymentContract.model_validate(data), transcript)
 
 
+def dropped_promise(data: dict) -> dict:
+    """Add a requirement the room agreed on that no section ever references."""
+    data["requirements"].append({
+        "id": "REQ-099",
+        "title": "Invoice data never leaves EU-hosted infrastructure",
+        "statement": "Nothing we process may be stored or served outside the EU.",
+        "category": "security",
+        "stakeholder": "Jonas Weber (Security)",
+        "source_turns": data["requirements"][0]["source_turns"],
+        "status": "resolved",
+        "conflicts_with": [],
+        "resolution": None,
+    })
+    return data
+
+
+# --- adopted promises that were never wired in -------------------------------
+
+def test_approved_contract_cannot_drop_an_adopted_promise(approved_dict, transcript):
+    report = validate_dict(dropped_promise(approved_dict), transcript)
+    assert report.unwired_requirements == ["REQ-099"]
+    assert report.exit_code == 1
+    assert any("no executable section references" in e for e in report.approval_errors)
+
+
+def test_draft_reports_an_unwired_requirement_without_failing(draft_dict, transcript):
+    # a draft is allowed to be half wired: that is the reviewer's work in
+    # progress, so it is a finding, not a failure
+    report = validate_dict(dropped_promise(draft_dict), transcript)
+    assert report.unwired_requirements == ["REQ-099"]
+    assert report.exit_code == 0
+
+
+def test_rejected_requirements_are_not_reported_as_unwired(approved_dict, transcript):
+    # the golden approved contract rejects three requirements; a rejected
+    # promise must never be wired in, so it is not a dropped one either
+    report = validate_dict(approved_dict, transcript)
+    assert report.unwired_requirements == []
+    rejected = [
+        r["id"] for r in approved_dict["requirements"]
+        if (r.get("resolution") or {}).get("decision") == "rejected"
+    ]
+    assert len(rejected) == 3
+
+
+def test_open_conflicts_are_not_reported_as_unwired(draft_dict, transcript):
+    # the six requirements in open conflict in the golden draft are unwired by
+    # definition: which side gets wired is exactly what resolving them decides
+    report = validate_dict(draft_dict, transcript)
+    assert report.unwired_requirements == []
+    assert report.conflict_groups
+
+
+def test_unwired_requirement_blocks_the_cli(tmp_path, approved_dict, transcript):
+    contract_path = tmp_path / "contract.json"
+    contract_path.write_text(
+        json.dumps(dropped_promise(approved_dict), indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    shutil.copyfile(TRANSCRIPT_PATH, tmp_path / "transcript.md")
+    result = runner.invoke(app, ["validate", "--contract", str(contract_path)])
+    assert result.exit_code == 1
+    assert "ADOPTED BUT NOT WIRED IN (1)" in result.output
+    assert "REQ-099" in result.output
+
+
 # --- structural errors (exit 2 territory) ------------------------------------
 
 def test_dangling_turn_fixture_fails(transcript):

@@ -2,8 +2,9 @@
 
 ``approve`` is the one legitimate way a contract gains ``status: approved``.
 It runs the full validator first and refuses anything that is not ready:
-structural defects, open conflicts, blocking open questions, and unfilled
-required fields all block the stamp. On success it sets the sign-off
+structural defects, open conflicts, blocking open questions, unfilled
+required fields, and adopted requirements that no executable section
+references all block the stamp. On success it sets the sign-off
 (``approved_by``, ``approved_at``) and pins the SHA-256 of the transcript
 the provenance was just verified against; every other byte of the document
 stays exactly as the human reviewed it.
@@ -11,6 +12,9 @@ stays exactly as the human reviewed it.
 Fail-closed rules:
 - an already-approved contract is refused; a sign-off is a record, and
   re-stamping would silently rewrite who approved what and when
+- a draft that already carries ``metadata.approval_signature`` is refused:
+  approve is what signs, so an attestation on an unapproved document did not
+  come from this pipeline and must not be laundered into an approved one
 - the sign-off itself is checked: a blank approver or a non-calendar date
   is a hard error, not a warning
 - the stamped result is re-validated end to end (JSON Schema, model,
@@ -76,6 +80,17 @@ def approve_contract(
             f"refusing to re-stamp an existing sign-off",
             exit_code=1,
         )
+    if meta.approval_signature is not None:
+        # A draft is never signed: approve is what signs. An attestation on an
+        # unapproved document was hand-written or invented by an extractor, and
+        # stamping it would launder that block into an approved artifact whose
+        # own output reports the approval as unsigned.
+        raise ApprovalError(
+            "draft carries metadata.approval_signature, but only approve signs a "
+            "contract; this attestation was not produced by this pipeline. Remove "
+            "it before sign-off",
+            exit_code=2,
+        )
 
     report = validate_contract(contract, transcript)
     if report.errors:
@@ -97,6 +112,13 @@ def approve_contract(
         )
     for field_name in report.pending_fields:
         blockers.append(f"pending required field: {field_name}")
+    by_id = contract.requirement_by_id()
+    for req_id in report.unwired_requirements:
+        req = by_id[req_id]
+        blockers.append(
+            f"adopted but not wired into any executable section: {req_id} "
+            f"({req.stakeholder}: {req.title})"
+        )
     if blockers:
         raise ApprovalError(
             "the discovery review is not finished; resolve these before sign-off",

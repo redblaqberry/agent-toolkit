@@ -7,8 +7,9 @@ Three kinds of output, mirroring agent-eval-gate's fail-closed exit codes:
 - ``approval_errors``: the contract claims ``status: approved`` but still has
   open conflicts, blocking open questions, or unfilled required fields.
   Exit 1. No unreviewed or incompletely resolved contract can run.
-- findings (``conflict_groups``, ``open_questions``, ``pending_fields``):
-  expected content of a draft, surfaced for the human reviewer. Exit 0.
+- findings (``conflict_groups``, ``open_questions``, ``pending_fields``,
+  ``unwired_requirements``): expected content of a draft, surfaced for the
+  human reviewer. Exit 0.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ class ValidationReport:
     open_blocking_questions: list[str] = field(default_factory=list)
     open_nonblocking_questions: list[str] = field(default_factory=list)
     pending_fields: list[str] = field(default_factory=list)
+    unwired_requirements: list[str] = field(default_factory=list)
     provenance_verified: bool = False  # True only when a transcript was checked
 
     @property
@@ -207,7 +209,10 @@ def validate_contract(
             errors.append(f"duplicate allowed action {action.action}")
         action_names.add(action.action)
 
+    referenced: set[str] = set()
+
     def check_ref(section: str, req_id: str, categories: set[str]) -> None:
+        referenced.add(req_id)
         req = by_id.get(req_id)
         if req is None:
             errors.append(f"{section}: references unknown requirement {req_id}")
@@ -283,6 +288,21 @@ def validate_contract(
     if contract.data_governance is None:
         report.pending_fields.append("data_governance")
 
+    # A contract is only executable through its requirements, so the reverse
+    # direction matters as much as the forward one: a requirement that survived
+    # review resolved and non-rejected, but that no executable section
+    # references, is a customer promise that was accepted and then quietly
+    # dropped out of the deployment. Requirements still in open conflict are
+    # expected to be unwired (that is what resolving them decides), and a
+    # rejected one must never be wired.
+    report.unwired_requirements = [
+        req.id
+        for req in requirements
+        if req.status == "resolved"
+        and not (req.resolution is not None and req.resolution.decision == "rejected")
+        and req.id not in referenced
+    ]
+
     # --- approval gate: no unreviewed contract can run -----------------------
     if contract.metadata.status == "approved":
         approval = report.approval_errors
@@ -307,6 +327,12 @@ def validate_contract(
         if report.pending_fields:
             approval.append(
                 f"approved contract has unfilled required fields: {report.pending_fields}"
+            )
+        if report.unwired_requirements:
+            approval.append(
+                f"approved contract adopts requirements that no executable section "
+                f"references: {report.unwired_requirements}; an adopted promise must "
+                f"be wired into the contract or resolved as rejected, never dropped"
             )
 
     return report

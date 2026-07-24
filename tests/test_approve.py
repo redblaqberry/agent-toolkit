@@ -67,6 +67,53 @@ def test_approve_reproduces_golden_approved_contract(tmp_path, resolved_draft):
     assert "transcript pinned: sha256" in result.output
 
 
+def test_approve_refuses_a_draft_that_drops_an_adopted_promise(
+    tmp_path, resolved_draft
+):
+    # the reviewer agreed to something and then never wired it into the
+    # contract; signing that off would put a promise nobody tests into a
+    # document that claims every promise is tested
+    resolved_draft["requirements"].append({
+        "id": "REQ-099",
+        "title": "Invoice data never leaves EU-hosted infrastructure",
+        "statement": "Nothing we process may be stored or served outside the EU.",
+        "category": "security",
+        "stakeholder": "Jonas Weber (Security)",
+        "source_turns": resolved_draft["requirements"][0]["source_turns"],
+        "status": "resolved",
+        "conflicts_with": [],
+        "resolution": None,
+    })
+    contract = workdir(tmp_path, resolved_draft)
+    out = tmp_path / "approved.json"
+    result = approve_cli(contract, out)
+    assert result.exit_code == 1, combined(result)
+    assert "adopted but not wired into any executable section: REQ-099" in combined(result)
+    assert not out.exists()
+
+
+def test_approve_refuses_a_draft_that_already_carries_an_attestation(
+    tmp_path, resolved_draft
+):
+    # approve is what signs. A signature on an unapproved document did not come
+    # from this pipeline, and stamping it would launder that block into an
+    # approved artifact while the command reports the approval as unsigned
+    resolved_draft["metadata"]["approval_signature"] = {
+        "version": "attest.v1",
+        "kind": "deployment-contract",
+        "algorithm": "ed25519",
+        "public_key_fingerprint": "deadbeefdeadbeef",
+        "digest_sha256": "0" * 64,
+        "signature": "Zm9yZ2Vk",
+    }
+    contract = workdir(tmp_path, resolved_draft)
+    out = tmp_path / "approved.json"
+    result = approve_cli(contract, out)
+    assert result.exit_code == 2, combined(result)
+    assert "only approve signs a contract" in combined(result)
+    assert not out.exists()
+
+
 def test_approved_output_passes_require_approved(tmp_path, resolved_draft):
     contract = workdir(tmp_path, resolved_draft)
     out = tmp_path / "approved.json"
