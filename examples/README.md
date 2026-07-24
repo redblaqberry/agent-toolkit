@@ -12,8 +12,9 @@ rather than asserted.
 | Actions | read_invoice, extract_fields, match_purchase_order, prepare_posting_draft, request_approval, post_invoice_to_erp | read_order, check_return_window, check_fraud_signals, issue_refund, request_approval, send_customer_message |
 | Shows | the full draft to approved walkthrough, with three seeded conflicts and a blocking question | that a second contract compiles with no change to the compiler |
 
-Both compile to ten scenarios from their own `acceptance_rules`. Nothing in
-`src/discoveryspec/scenarios.py` mentions either domain; `tests/test_second_domain.py`
+Both compile to ten scenarios from their own `acceptance_rules`. No code path in
+`src/discoveryspec/scenarios.py` branches on either domain (one line of its module
+docstring names the old invoice-only design it replaced); `tests/test_second_domain.py`
 fails if a word from the first example ever appears in the second one's export.
 
 ## Running them

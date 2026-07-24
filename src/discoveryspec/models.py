@@ -4,9 +4,19 @@ A contract is only executable through its requirements: every KPI, role,
 action, escalation rule, security constraint, SLO, environment, and
 data-governance entry references a requirement id, and every requirement
 traces to numbered transcript turns or an explicitly recorded follow-up.
-The canonical JSON Schema lives in ``schemas/deployment-contract.v2.schema.json``;
-these models mirror it field for field, including which keys are mandatory,
-so the model and the schema accept the same documents.
+The canonical JSON Schema in ``schemas/deployment-contract.v2.schema.json`` is
+the wire format: it is the language-neutral definition a third party would
+generate against, and these models mirror its fields and its mandatory keys.
+
+They are not interchangeable gates, and the loader deliberately applies both.
+The schema is stricter about JSON types (it rejects ``"3"`` where an integer is
+required, which pydantic would coerce). The models are stricter about things
+JSON Schema cannot express: calendar-valid dates (``2026-02-31`` satisfies the
+date pattern and is not a day), the snake_case key pattern inside
+``max_action_calls``, and text that is present but blank. A document has to
+satisfy both to load, so the effective contract is the intersection; anything
+entering through ``DeploymentContract.model_validate`` alone has skipped the
+wire-format half.
 
 v2 supersedes v1, which had no released consumers. It adds ``acceptance_rules``
 (the typed primitives the acceptance suite is compiled from, replacing
@@ -43,6 +53,20 @@ def _calendar_valid(value: str) -> str:
     return value
 
 
+def _non_blank(value: str) -> str:
+    """Reject whitespace-only text.
+
+    ``min_length=1`` accepts a single space, which is worse than an empty
+    string here: a blank reason or verifier reads as a filled-in field all the
+    way to the customer-facing report, and a blank output constraint is a check
+    that every possible answer satisfies.
+    """
+    if not value.strip():
+        raise ValueError("must not be blank or whitespace only")
+    return value
+
+
+NonBlank = Annotated[str, Field(min_length=1), AfterValidator(_non_blank)]
 ReqId = Annotated[str, Field(pattern=REQ_ID_PATTERN)]
 Name = Annotated[str, Field(pattern=NAME_PATTERN)]
 TurnNumber = Annotated[int, Field(ge=1)]
@@ -77,8 +101,8 @@ class OutOfBandVerification(StrictModel):
     suite states what it does not cover, and who signed off on covering it.
     """
 
-    reason: str = Field(min_length=1)
-    verified_by: str = Field(min_length=1)
+    reason: NonBlank
+    verified_by: NonBlank
 
 
 class Requirement(StrictModel):
@@ -156,7 +180,7 @@ class CostSlo(StrictModel):
     # what one unit of work is in this deployment ("invoice", "refund
     # request"). The ceiling is per unit, and the manager report names it, so
     # the number is never presented without saying what it is per.
-    unit: str = Field(min_length=1)
+    unit: NonBlank
     requirement_id: ReqId
 
 
@@ -187,17 +211,18 @@ class Expectation(StrictModel):
     """The observable outcome of one acceptance rule.
 
     Everything here is checked deterministically against the recorded
-    trajectory. A rule whose expectation is empty and that carries no rubric
-    has no observable outcome at all, and the compiler refuses it rather than
-    exporting a scenario that cannot fail.
+    trajectory. A rule whose expectation is empty has no outcome that can fail,
+    and the validator refuses it: a rubric does not substitute, because replay
+    mode does not run the judge, so a rubric-only scenario would pass
+    unconditionally in the one mode that runs without credentials.
     """
 
     actions: list[ExpectedAction] = Field(default_factory=list)
     actions_ordered: bool = False
     forbidden_actions: list[Name] = Field(default_factory=list)
     max_action_calls: dict[Name, int] = Field(default_factory=dict)
-    output_contains: list[str] = Field(default_factory=list)
-    output_excludes: list[str] = Field(default_factory=list)
+    output_contains: list[NonBlank] = Field(default_factory=list)
+    output_excludes: list[NonBlank] = Field(default_factory=list)
 
     def is_empty(self) -> bool:
         return not (
@@ -236,17 +261,19 @@ class AcceptanceRule(StrictModel):
     # rejected side of a resolved conflict; unlike requirement_id they may be
     # rejected, because the point is to show what was decided against
     cites: list[ReqId] = Field(default_factory=list)
-    label: str = Field(min_length=1)  # plain language, for the manager report
+    label: NonBlank  # plain language, for the manager report
     # the Given/When/Then the exported scenario carries as its description
-    given: str = Field(min_length=1)
-    when: str = Field(min_length=1)
-    then: str = Field(min_length=1)
-    message: str = Field(min_length=1)  # sent verbatim to the agent under test
+    given: NonBlank
+    when: NonBlank
+    then: NonBlank
+    message: NonBlank  # sent verbatim to the agent under test
     # whether this exercises the interactive path the p95 latency SLO applies
     # to; batch and approver-side flows are excluded from that population
     interactive: bool = True
     expect: Expectation = Field(default_factory=Expectation)
-    rubric: list[str] = Field(default_factory=list)
+    # judged criteria, and only ever in addition to expect: the judge does not
+    # run in replay mode, so a rubric can never be a rule's only check
+    rubric: list[NonBlank] = Field(default_factory=list)
     max_steps: Optional[int] = Field(default=None, ge=1)
 
 
@@ -295,9 +322,21 @@ class DeploymentContract(StrictModel):
 # Categories that describe agent behavior, and can therefore be checked by an
 # acceptance suite that observes a trajectory. The others are contract facts:
 # a KPI is measured in production over time, roles and environments are
-# configuration, and data governance is a hosting and retention property. Only
-# these five have to carry an acceptance rule or an explicit out-of-band
-# verification record before a contract can produce a suite.
+# configuration, and data governance is a hosting and retention property.
 BEHAVIORAL_CATEGORIES = frozenset(
     {"allowed_action", "escalation", "security", "latency", "cost"}
+)
+
+# Sections whose entries constrain what the agent does at run time. Coverage is
+# owed by anything wired into one of these as well as by anything in a
+# behavioral category, because the category alone is a label the contract
+# author chooses: security_constraints accepts a requirement filed as `data`,
+# and without this a behavioral promise could be filed under a non-behavioral
+# category and escape the requirement to be tested or explicitly excused.
+BEHAVIORAL_SECTIONS = (
+    "allowed_actions",
+    "escalation_rules",
+    "security_constraints",
+    "slo.p95_latency_ms",
+    "slo.cost_per_task_eur",
 )

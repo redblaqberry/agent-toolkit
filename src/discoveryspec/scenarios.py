@@ -267,6 +267,10 @@ def gate_export(contract: DeploymentContract, transcript: Transcript) -> tuple[d
         # what this suite does NOT check, carried with it on purpose: a promise
         # verified somewhere else is still a promise, and a reader of the export
         # should never have to infer the gap from an absence
+        # only adopted promises: the report presents these as commitments that
+        # remain binding, so a rejected or still-contested requirement must
+        # never appear here. The validator refuses that combination outright;
+        # this filter keeps the export honest even if it is reached another way.
         "not_covered": [
             {
                 "requirement_id": req.id,
@@ -277,6 +281,10 @@ def gate_export(contract: DeploymentContract, transcript: Transcript) -> tuple[d
             }
             for req in contract.requirements
             if req.out_of_band_verification is not None
+            and req.status == "resolved"
+            and not (
+                req.resolution is not None and req.resolution.decision == "rejected"
+            )
         ],
     }
     return scenarios_payload, config_payload

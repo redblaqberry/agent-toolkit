@@ -142,8 +142,15 @@ def test_draft_must_not_carry_a_signature(workspace):
 
 
 def _prepare_run(ws, verdict_fail=False):
-    """Approve+sign, export, build fixtures, run+sign; return the run dir."""
-    import agent_eval_gate as gate
+    """Approve+sign, export, build fixtures, run+sign; return the run dir.
+
+    The skip guard lives here rather than in each caller: a caller that forgets
+    it turns a missing optional dependency into a hard failure, which is what
+    made the CI job without agent-eval-gate installed go red.
+    """
+    gate = pytest.importorskip(
+        "agent_eval_gate", reason="agent-eval-gate not installed; run-command tests skipped"
+    )
 
     assert approve(ws).exit_code == 0
     export = ws / "export"

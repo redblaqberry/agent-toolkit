@@ -17,8 +17,7 @@
     "security_constraints",
     "slo",
     "environment",
-    "data_governance",
-    "acceptance_rules"
+    "data_governance"
   ],
   "properties": {
     "contract_version": {

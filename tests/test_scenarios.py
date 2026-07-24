@@ -6,6 +6,7 @@ import json
 
 import pytest
 import yaml
+from pydantic import ValidationError
 from typer.testing import CliRunner
 
 from discoveryspec import (
@@ -267,7 +268,145 @@ def test_a_rule_with_no_observable_outcome_is_refused(approved_dict, transcript_
     contract = DeploymentContract.model_validate(approved_dict)
     report = validate_contract(contract, transcript_module)
     assert report.exit_code == 2
-    assert any("no observable outcome" in e for e in report.errors)
+    assert any("no deterministic outcome" in e for e in report.errors)
+
+
+def test_a_rubric_only_rule_is_refused(approved_dict, transcript_module):
+    """A rubric is not a check in the mode that actually runs.
+
+    Replay mode never invokes the judge, so a rule whose only outcome is a
+    rubric compiles to a scenario with empty checks and passes unconditionally.
+    That is the exact shape of a test that cannot fail.
+    """
+    rule = approved_dict["acceptance_rules"][0]
+    rule["expect"] = {}
+    rule["rubric"] = ["The agent does the right thing."]
+    contract = DeploymentContract.model_validate(approved_dict)
+    report = validate_contract(contract, transcript_module)
+    assert report.exit_code == 2
+    assert any("a rubric alone cannot fail in replay mode" in e for e in report.errors)
+
+
+def test_a_blank_output_constraint_is_refused(approved_dict):
+    # "" is contained in every string, including an empty answer, so this is a
+    # check that no trajectory can fail
+    approved_dict["acceptance_rules"][0]["expect"]["output_contains"] = [""]
+    with pytest.raises(ValidationError):
+        DeploymentContract.model_validate(approved_dict)
+
+    approved_dict["acceptance_rules"][0]["expect"]["output_contains"] = ["   "]
+    with pytest.raises(ValidationError):
+        DeploymentContract.model_validate(approved_dict)
+
+
+def test_a_repeated_expected_action_is_refused(approved_dict, transcript_module):
+    # arguments are matched by action name, so a second entry for the same
+    # action would silently overwrite the first one's args_subset
+    approved_dict["acceptance_rules"][0]["expect"]["actions"].append(
+        {"name": "read_invoice", "args_subset": {"invoice_id": "INV-9999"}}
+    )
+    contract = DeploymentContract.model_validate(approved_dict)
+    report = validate_contract(contract, transcript_module)
+    assert report.exit_code == 2
+    assert any("more than once in expect.actions" in e for e in report.errors)
+
+
+def test_a_behavioral_promise_cannot_hide_under_a_quiet_category(
+    approved_dict, transcript_module
+):
+    """Category is a label the author picks, so coverage cannot rest on it alone.
+
+    security_constraints accepts a requirement filed as `data`, so refiling a
+    security promise that way would drop it out of the coverage rule while it
+    still constrains the agent at run time.
+    """
+    approved_dict["acceptance_rules"] = [
+        r for r in approved_dict["acceptance_rules"] if r["id"] != "RULE-007"
+    ]
+    for req in approved_dict["requirements"]:
+        if req["id"] == "REQ-013":
+            req["category"] = "data"
+    contract = DeploymentContract.model_validate(approved_dict)
+    report = validate_contract(contract, transcript_module)
+    assert report.untestable_requirements == ["REQ-013"]
+    assert report.exit_code == 1
+
+
+def test_a_rejected_requirement_cannot_be_excused_out_of_band(
+    approved_dict, transcript_module
+):
+    # the export tells the customer these commitments remain binding, and a
+    # rejected requirement is the opposite of binding
+    for req in approved_dict["requirements"]:
+        if req["id"] == "REQ-004":  # resolved as rejected
+            req["out_of_band_verification"] = {
+                "reason": "handled elsewhere",
+                "verified_by": "nobody at all",
+            }
+    contract = DeploymentContract.model_validate(approved_dict)
+    report = validate_contract(contract, transcript_module)
+    assert report.exit_code == 2
+    assert any("only a live promise can be verified out of band" in e for e in report.errors)
+
+
+def test_a_blank_out_of_band_record_is_refused(approved_dict):
+    # min_length=1 accepts a single space, which reads as a filled-in field all
+    # the way to the customer-facing report
+    for req in approved_dict["requirements"]:
+        if req["id"] == "REQ-011":
+            req["out_of_band_verification"] = {"reason": "   ", "verified_by": " "}
+    with pytest.raises(ValidationError):
+        DeploymentContract.model_validate(approved_dict)
+
+
+def test_duplicate_rule_ids_and_slugs_are_refused(approved_dict, transcript_module):
+    duplicate = json.loads(json.dumps(approved_dict["acceptance_rules"][0]))
+    duplicate["requirement_id"] = "REQ-013"
+    approved_dict["acceptance_rules"].append(duplicate)
+    contract = DeploymentContract.model_validate(approved_dict)
+    report = validate_contract(contract, transcript_module)
+    assert report.exit_code == 2
+    assert any("duplicate acceptance rule id" in e for e in report.errors)
+    assert any("duplicate acceptance rule slug" in e for e in report.errors)
+
+
+def test_a_rule_citing_an_unknown_requirement_is_refused(
+    approved_dict, transcript_module
+):
+    approved_dict["acceptance_rules"][0]["cites"].append("REQ-404")
+    contract = DeploymentContract.model_validate(approved_dict)
+    report = validate_contract(contract, transcript_module)
+    assert report.exit_code == 2
+    assert any("cites unknown requirement REQ-404" in e for e in report.errors)
+
+
+def test_a_rule_enforcing_an_unresolved_requirement_is_refused(
+    approved_dict, transcript_module
+):
+    # a requirement still in open conflict has not been decided, so there is
+    # nothing settled to test
+    for req in approved_dict["requirements"]:
+        if req["id"] == "REQ-013":
+            req["status"] = "conflict"
+            req["conflicts_with"] = ["REQ-005"]
+            req["resolution"] = None
+    for req in approved_dict["requirements"]:
+        if req["id"] == "REQ-005":
+            req["conflicts_with"] = ["REQ-004", "REQ-013"]
+    contract = DeploymentContract.model_validate(approved_dict)
+    report = validate_contract(contract, transcript_module)
+    assert report.exit_code == 2
+    assert any("only a resolved requirement can be tested" in e for e in report.errors)
+
+
+def test_a_latency_rule_without_max_steps_is_refused(approved_dict, transcript_module):
+    for rule in approved_dict["acceptance_rules"]:
+        if rule["type"] == "latency":
+            rule["max_steps"] = None
+    contract = DeploymentContract.model_validate(approved_dict)
+    report = validate_contract(contract, transcript_module)
+    assert report.exit_code == 2
+    assert any("a latency rule needs max_steps" in e for e in report.errors)
 
 
 def test_approved_contract_without_acceptance_rules_is_refused(
@@ -295,6 +434,49 @@ def test_uncovered_behavioral_requirement_blocks_export(
     assert report.untestable_requirements == ["REQ-013"]
     assert report.exit_code == 1
     with pytest.raises(CompileError, match="does not validate cleanly"):
+        compile_scenarios(contract, transcript_module)
+
+
+def test_a_suite_of_nothing_is_refused(approved_dict, transcript_module):
+    """The reachable empty-suite path: every promise excused, no rules left.
+
+    With all coverage satisfied out of band the validator is happy, so this is
+    the one way to reach an approved contract that compiles to zero scenarios.
+    An empty suite passes everything, which is worse than no suite at all.
+    """
+    approved_dict["acceptance_rules"] = []
+    contract = DeploymentContract.model_validate(approved_dict)
+    for req_id in validate_contract(contract, transcript_module).untestable_requirements:
+        for req in approved_dict["requirements"]:
+            if req["id"] == req_id:
+                req["out_of_band_verification"] = {
+                    "reason": "checked by the platform, not by any agent action",
+                    "verified_by": "Nordlicht IT review",
+                }
+    contract = DeploymentContract.model_validate(approved_dict)
+    assert validate_contract(contract, transcript_module).exit_code == 0
+
+    with pytest.raises(CompileError, match="nothing to compile") as excinfo:
+        compile_scenarios(contract, transcript_module)
+    assert excinfo.value.exit_code == 1
+    assert "having tested nothing" in str(excinfo.value)
+
+
+def test_a_rule_whose_requirements_carry_no_turns_is_refused(
+    approved_dict, transcript_module
+):
+    # a scenario with no transcript turns would run without provenance, which
+    # is the one thing every artifact here is supposed to carry
+    # RULE-001 enforces REQ-003 and cites REQ-001; strand both, leaving every
+    # other rule intact so the coverage gate stays satisfied and the compiler
+    # is actually reached
+    for req in approved_dict["requirements"]:
+        if req["id"] in ("REQ-001", "REQ-003"):
+            req["source_turns"] = []
+            req["followup_note"] = "agreed by email after the call"
+    contract = DeploymentContract.model_validate(approved_dict)
+    assert validate_contract(contract, transcript_module).exit_code == 0
+    with pytest.raises(CompileError, match="carry no transcript turns"):
         compile_scenarios(contract, transcript_module)
 
 

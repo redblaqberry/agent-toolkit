@@ -86,11 +86,58 @@ def test_bundled_example_renders_a_report(tmp_path, example_dir, contract_path, 
     ])
     assert rendered.exit_code == 0, combined(rendered)
     html = html_path.read_text(encoding="utf-8")
+    contract = json.loads(contract_path.read_text(encoding="utf-8"))
     assert "Cleared to deploy" in html
     # the page names the system under test, never a domain baked into the code
-    assert json.loads(contract_path.read_text(encoding="utf-8"))["metadata"]["system"] in html
-    # and it states what the suite did not check
+    assert contract["metadata"]["system"] in html
+    # the cost ceiling is labelled with this contract's own unit of work
+    assert f"Cost per processed {contract['slo']['cost_per_task_eur']['unit']}" in html
+
+    # and the section a reader needs most: not just its heading, but every
+    # promise it excuses, with the reason and the named verifier
     assert "What this suite does not check" in html
+    excused = [
+        r for r in contract["requirements"] if r.get("out_of_band_verification")
+    ]
+    assert excused, "the bundled example should exercise this section"
+    for req in excused:
+        assert req["title"] in html
+        assert req["stakeholder"] in html
+        assert req["out_of_band_verification"]["reason"] in html
+        assert req["out_of_band_verification"]["verified_by"] in html
+
+
+def test_run_console_names_what_it_did_not_check(tmp_path):
+    # the operator reading stdout must not have to open a JSON file to learn
+    # that a promise went untested
+    result, _ = run_suite(tmp_path, EXAMPLE, APPROVED_PATH)
+    assert result.exit_code == 0, combined(result)
+    output = combined(result)
+    assert "not covered by this suite: REQ-011" in output
+    assert "not covered by this suite: REQ-012" in output
+    assert "Nordlicht IT infrastructure review before go-live" in output
+
+
+def test_report_refuses_a_run_report_with_an_unreadable_slo_block(tmp_path):
+    """A foreign or hand-edited run report must fail closed, not traceback.
+
+    Exit 2 is the documented code for an integrity failure; a KeyError escaping
+    to the console would be exit 1, which is the code for a failed acceptance.
+    """
+    _, out = run_suite(tmp_path, EXAMPLE, APPROVED_PATH)
+    report_path = out / "run-report.json"
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    report["slo"].pop("cost_per_task_eur")
+    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+    rendered = runner.invoke(app, [
+        "report", "--contract", str(APPROVED_PATH), "--run", str(out),
+        "--out", str(tmp_path / "report.html"),
+    ])
+    assert rendered.exit_code == 2, combined(rendered)
+    assert "Traceback" not in combined(rendered)
+    assert "cost_per_task_eur" in combined(rendered)
+    assert not (tmp_path / "report.html").exists()
 
 
 def test_cost_ceiling_is_not_passed_by_a_hair(tmp_path):

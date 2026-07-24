@@ -294,8 +294,19 @@ def emoji_problems(view: dict) -> list[str]:
 def _require_keys(run_report: dict) -> list[str]:
     required = ("source", "scenarios", "slo", "verdict", "passed", "total",
                 "mode", "agent_model")
-    return [f"run-report.json is missing {key!r}" for key in required
-            if key not in run_report]
+    problems = [f"run-report.json is missing {key!r}" for key in required
+                if key not in run_report]
+    # the SLO block is indexed by name below; a run report from another tool or
+    # an older format must be refused with the pipeline's own integrity error,
+    # not surface as a KeyError traceback under a different exit code
+    slo = run_report.get("slo")
+    if not problems and not isinstance(slo, dict):
+        problems.append("run-report.json 'slo' is not an object")
+    elif not problems:
+        for key in ("p95_latency_ms", "cost_per_task_eur"):
+            if not isinstance(slo.get(key), dict):
+                problems.append(f"run-report.json slo is missing {key!r}")
+    return problems
 
 
 def build_view(

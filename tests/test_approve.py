@@ -92,6 +92,49 @@ def test_approve_refuses_a_draft_that_drops_an_adopted_promise(
     assert not out.exists()
 
 
+def test_approve_refuses_a_draft_with_an_untested_behavioral_promise(
+    tmp_path, resolved_draft
+):
+    """The sign-off gate, not just the validator, has to stop this.
+
+    A contract can be perfectly consistent and still promise behavior that no
+    acceptance rule checks and nobody has excused. Signing that off would put a
+    promise nothing tests inside a document whose whole claim is the opposite.
+    """
+    resolved_draft["acceptance_rules"] = [
+        r for r in resolved_draft["acceptance_rules"] if r["id"] != "RULE-007"
+    ]
+    contract = workdir(tmp_path, resolved_draft)
+    out = tmp_path / "approved.json"
+    result = approve_cli(contract, out)
+    assert result.exit_code == 1, combined(result)
+    assert (
+        "no acceptance rule and no recorded out-of-band verification: REQ-013"
+        in combined(result)
+    )
+    assert not out.exists()
+
+
+def test_approve_accepts_the_same_promise_when_it_is_excused_out_of_band(
+    tmp_path, resolved_draft
+):
+    # the escape hatch is real, but it has to be written down and signed for
+    resolved_draft["acceptance_rules"] = [
+        r for r in resolved_draft["acceptance_rules"] if r["id"] != "RULE-007"
+    ]
+    for req in resolved_draft["requirements"]:
+        if req["id"] == "REQ-013":
+            req["out_of_band_verification"] = {
+                "reason": "Prompt-injection resistance is covered by the platform "
+                          "input filter, ahead of the agent.",
+                "verified_by": "Nordlicht IT security review before go-live",
+            }
+    contract = workdir(tmp_path, resolved_draft)
+    out = tmp_path / "approved.json"
+    assert approve_cli(contract, out).exit_code == 0
+    assert out.exists()
+
+
 def test_approve_refuses_a_draft_that_already_carries_an_attestation(
     tmp_path, resolved_draft
 ):

@@ -16,7 +16,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .models import BEHAVIORAL_CATEGORIES, DeploymentContract, Requirement
+from .models import (
+    BEHAVIORAL_CATEGORIES,
+    BEHAVIORAL_SECTIONS,
+    DeploymentContract,
+    Requirement,
+)
 from .transcript import Transcript
 
 
@@ -211,9 +216,12 @@ def validate_contract(
         action_names.add(action.action)
 
     referenced: set[str] = set()
+    behavioral_refs: set[str] = set()
 
     def check_ref(section: str, req_id: str, categories: set[str]) -> None:
         referenced.add(req_id)
+        if section.startswith(BEHAVIORAL_SECTIONS):
+            behavioral_refs.add(req_id)
         req = by_id.get(req_id)
         if req is None:
             errors.append(f"{section}: references unknown requirement {req_id}")
@@ -273,6 +281,22 @@ def validate_contract(
         check_ref("data_governance", contract.data_governance.requirement_id, {"data"})
 
     # --- acceptance rules ---------------------------------------------------
+    for req in requirements:
+        if req.out_of_band_verification is None:
+            continue
+        if req.status != "resolved" or (
+            req.resolution is not None and req.resolution.decision == "rejected"
+        ):
+            # the export presents these to the customer as commitments that
+            # remain binding, so a rejected or still-contested requirement must
+            # never carry one
+            errors.append(
+                f"{req.id}: carries out_of_band_verification but was not adopted "
+                f"(status {req.status}, decision "
+                f"{req.resolution.decision if req.resolution else 'none'}); only a "
+                f"live promise can be verified out of band"
+            )
+
     rule_ids: set[str] = set()
     slugs: set[str] = set()
     for rule in contract.acceptance_rules:
@@ -320,13 +344,27 @@ def validate_contract(
                     f"{rule.id}: names action {action!r}, which is not in the "
                     f"contract's allowed_actions"
                 )
-        if rule.expect.is_empty() and not rule.rubric:
-            # a scenario that checks nothing cannot fail, so exporting it would
-            # add a passing row to the report that proves nothing at all
+        expected_names = [a.name for a in rule.expect.actions]
+        repeated = sorted({n for n in expected_names if expected_names.count(n) > 1})
+        if repeated:
+            # the exported scenario carries one args_subset per action name, so a
+            # repeated action would silently keep the last entry's arguments and
+            # drop the others; the check the author wrote would vanish
             errors.append(
-                f"{rule.id}: has no observable outcome (no expected or forbidden "
-                f"actions, no output constraints, no rubric); a rule that cannot "
-                f"fail is not a test"
+                f"{rule.id}: lists action(s) {repeated} more than once in expect."
+                f"actions; one expectation per action, because arguments are "
+                f"matched by action name"
+            )
+        if rule.expect.is_empty():
+            # a scenario with no deterministic check cannot fail in replay mode,
+            # which is the default and the only mode that runs without
+            # credentials, so it would add a passing row having tested nothing.
+            # A rubric does not close this: the judge does not run in replay.
+            errors.append(
+                f"{rule.id}: has no deterministic outcome (no expected or forbidden "
+                f"actions, no call limits, no output constraints); a rubric alone "
+                f"cannot fail in replay mode, so a rule that carries only one is "
+                f"not a test"
             )
         if rule.type == "latency" and rule.max_steps is None:
             errors.append(
@@ -375,7 +413,7 @@ def validate_contract(
     report.untestable_requirements = [
         req.id
         for req in requirements
-        if req.category in BEHAVIORAL_CATEGORIES
+        if (req.category in BEHAVIORAL_CATEGORIES or req.id in behavioral_refs)
         and req.status == "resolved"
         and not (req.resolution is not None and req.resolution.decision == "rejected")
         and req.id not in ruled

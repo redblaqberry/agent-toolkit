@@ -704,7 +704,7 @@ def export_gate(
         "before exporting a suite from this contract",
     ),
 ) -> None:
-    """Compile the ten acceptance scenarios into agent-eval-gate artifacts.
+    """Compile the contract's acceptance rules into agent-eval-gate artifacts.
 
     Only an approved, structurally clean contract exports; anything else is
     exit 1 (no unreviewed contract can run). Writes ``scenarios.yaml`` in
@@ -1223,10 +1223,16 @@ def keygen(
     private_pem, public_pem = generate_keypair()
     try:
         private_path.parent.mkdir(parents=True, exist_ok=True)
-        # exclusive create with an owner-only mode: a private key must never be
-        # written world-readable, and a check-then-write would leave a window
-        # for a hostile file to be pre-created at this path
-        flags = os.O_WRONLY | os.O_CREAT | (os.O_TRUNC if force else os.O_EXCL)
+        # Always an exclusive create, including under --force: the mode argument
+        # to open(2) applies only when the file is created, so writing into an
+        # existing file would inherit whatever owner and permissions it already
+        # had, which is exactly the case --force is used in. Unlink first, then
+        # create exclusively, so the key is always a fresh owner-only file and a
+        # racing writer loses to EEXIST rather than silently keeping its own
+        # permissions. O_BINARY keeps the PEM bytes identical on Windows.
+        if force and private_path.exists():
+            private_path.unlink()
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
         handle = os.open(private_path, flags, 0o600)
         try:
             os.write(handle, private_pem)
