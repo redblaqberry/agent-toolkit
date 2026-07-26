@@ -53,14 +53,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-JOBS = ROOT.parent
-BIN = ROOT / ".venv" / "Scripts"
+COMPONENTS = ROOT / "components"
+BIN = ROOT / ".venv" / ("Scripts" if sys.platform == "win32" else "bin")
 EXE = ".exe" if sys.platform == "win32" else ""
 
-DISCOVERYSPEC = JOBS / "01-discoveryspec"
-STATEDIFF = JOBS / "03-statediff"
-REVPACK = JOBS / "05-release-evidence-pack"
-BLASTRADIUS = JOBS / "07-blastradius"
+# components/2-silobench is the environment the fixtures were captured from. It
+# is replayed rather than started, so no stage below invokes it directly.
+DISCOVERYSPEC = COMPONENTS / "1-discoveryspec"
+STATEDIFF = COMPONENTS / "3-statediff"
+BLASTRADIUS = COMPONENTS / "4-blastradius"
+REVPACK = COMPONENTS / "5-release-evidence-pack"
 
 for stream in (sys.stdout, sys.stderr):
     try:
@@ -86,16 +88,16 @@ class Stage:
 
 
 def run(tool: str, *args: str) -> tuple[int, str]:
-    """Invoke one of the five CLIs and return its exit code and output."""
+    """Invoke one of the four CLIs and return its exit code and output."""
     executable = BIN / f"{tool}{EXE}"
     if not executable.exists():
         raise SystemExit(
             f"{executable} is missing. Run `python setup_env.py` first: it "
-            f"builds the venv and installs the five components in editable mode."
+            f"builds the venv and installs the Python components in editable mode."
         )
     done = subprocess.run(
         [str(executable), *args], capture_output=True, text=True,
-        encoding="utf-8", errors="replace", cwd=str(JOBS),
+        encoding="utf-8", errors="replace", cwd=str(ROOT),
     )
     return done.returncode, (done.stdout or "") + (done.stderr or "")
 

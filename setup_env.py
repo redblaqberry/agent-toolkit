@@ -1,12 +1,17 @@
-"""Build the venv and install the five components, editable, in one place.
+"""Build the venv and install the Python components, editable, in one place.
 
     python setup_env.py           build it
     python setup_env.py --check   verify an existing one, install nothing
 
-The five components pin compatible dependencies (pydantic, typer, pyyaml), which
-is what makes a single environment possible and is worth checking rather than
-assuming: if a future version of one of them diverges, this is where it shows up,
-loudly, instead of as a confusing failure three stages into the demo.
+Four of the five components are Python and are installed here. The fifth,
+`components/2-silobench`, is the TypeScript environment the fixtures were
+captured from: it is not pip-installable, and the demo replays committed
+captures rather than starting it, so it needs no install step.
+
+Those four pin compatible dependencies (pydantic, typer, pyyaml), which is what
+makes a single environment possible and is worth checking rather than assuming:
+if a future version of one of them diverges, this is where it shows up, loudly,
+instead of as a confusing failure three stages into the demo.
 
 `ledger-agent` is deliberately not installed. It pulls google-adk and litellm,
 which are heavy and which nothing in this demo calls. The agent's behaviour here
@@ -22,19 +27,18 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-JOBS = ROOT.parent
+JOBS = ROOT / "components"
 VENV = ROOT / ".venv"
 BIN = VENV / ("Scripts" if sys.platform == "win32" else "bin")
 PY = BIN / ("python.exe" if sys.platform == "win32" else "python")
 EXE = ".exe" if sys.platform == "win32" else ""
 
-# (directory, import name, CLI name)
+# (directory under components/, import name, CLI name)
 COMPONENTS = [
-    ("01-discoveryspec", "discoveryspec", "discoveryspec"),
-    ("03-statediff", "statediff", "statediff"),
-    ("04-mcp-contract-canary", "mcp_canary", "mcp-canary"),
-    ("05-release-evidence-pack", "revpack", "revpack"),
-    ("07-blastradius", "blastradius", "blast"),
+    ("1-discoveryspec", "discoveryspec", "discoveryspec"),
+    ("3-statediff", "statediff", "statediff"),
+    ("4-blastradius", "blastradius", "blast"),
+    ("5-release-evidence-pack", "revpack", "revpack"),
 ]
 
 for stream in (sys.stdout, sys.stderr):
@@ -69,8 +73,8 @@ def build() -> int:
     if missing:
         print("these component directories are missing, so the demo cannot be "
               f"assembled: {missing}", file=sys.stderr)
-        print("Clone them next to this one, or see the README for the repo URLs.",
-              file=sys.stderr)
+        print("They are part of this repository under components/, so this "
+              "checkout is incomplete.", file=sys.stderr)
         return 1
 
     if not PY.exists():
