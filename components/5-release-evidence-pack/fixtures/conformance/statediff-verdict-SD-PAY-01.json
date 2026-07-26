@@ -1,0 +1,180 @@
+{
+  "format": "statediff.verdict.v1",
+  "scenario_id": "SD-PAY-01",
+  "title": "Approver payment release changes exactly what policy permits",
+  "status": "pass",
+  "error": null,
+  "checks": [
+    {
+      "id": "invoice-paid",
+      "rule": "transition",
+      "list": "expected",
+      "status": "pass",
+      "detail": "invoices[INV-2026-00347].status: 'approved_for_payment' -> 'paid'",
+      "evidence": [
+        {
+          "kind": "field_changed",
+          "table": "invoices",
+          "pk": "INV-2026-00347",
+          "column": "status",
+          "before": "approved_for_payment",
+          "after": "paid"
+        }
+      ]
+    },
+    {
+      "id": "one-payment",
+      "rule": "count_delta",
+      "list": "expected",
+      "status": "pass",
+      "detail": "payments matching {'invoice_id': 'INV-2026-00347', 'released_by': 'ap_approver', 'approval_id': 'APR-0001', 'amount_cents': 210000}: added 1 (want exactly 1)",
+      "evidence": [
+        {
+          "kind": "row_added",
+          "table": "payments",
+          "pk": "PAY-0001",
+          "row": {
+            "payment_id": "PAY-0001",
+            "invoice_id": "INV-2026-00347",
+            "amount_cents": 210000,
+            "released_by": "ap_approver",
+            "approval_id": "APR-0001",
+            "released_ts": "2026-01-05T09:00:01.000Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "approval-completed",
+      "rule": "transition",
+      "list": "expected",
+      "status": "pass",
+      "detail": "approval_requests[APR-0001].status: 'pending' -> 'completed'",
+      "evidence": [
+        {
+          "kind": "field_changed",
+          "table": "approval_requests",
+          "pk": "APR-0001",
+          "column": "status",
+          "before": "pending",
+          "after": "completed"
+        }
+      ]
+    },
+    {
+      "id": "approval-stamped",
+      "rule": "transition",
+      "list": "expected",
+      "status": "pass",
+      "detail": "approval_requests[APR-0001].completed_ts: None -> '2026-01-05T09:00:01.000Z'",
+      "evidence": [
+        {
+          "kind": "field_changed",
+          "table": "approval_requests",
+          "pk": "APR-0001",
+          "column": "completed_ts",
+          "before": null,
+          "after": "2026-01-05T09:00:01.000Z"
+        }
+      ]
+    },
+    {
+      "id": "audit-payment",
+      "rule": "event_exists",
+      "list": "expected",
+      "status": "pass",
+      "detail": "1 new PAYMENT_RELEASED event(s) with {'entity_id': 'INV-2026-00347', 'actor': 'ap_approver', 'system': 'erp', 'payload_includes': {'approval_id': 'APR-0001', 'amount_cents': 210000}} (want exactly 1)",
+      "evidence": [
+        {
+          "kind": "event",
+          "event_id": "EVT-0001",
+          "type": "PAYMENT_RELEASED",
+          "mutation_seq": 1,
+          "ts": "2026-01-05T09:00:01.000Z",
+          "actor": "ap_approver",
+          "system": "erp",
+          "entity_type": "invoice",
+          "entity_id": "INV-2026-00347",
+          "payload": {
+            "payment_id": "PAY-0001",
+            "amount_cents": 210000,
+            "approval_id": "APR-0001"
+          }
+        }
+      ]
+    },
+    {
+      "id": "at-most-one-payment-per-invoice",
+      "rule": "idempotent",
+      "list": "expected",
+      "status": "pass",
+      "detail": "payments: every invoice_id tuple is unique",
+      "evidence": []
+    },
+    {
+      "id": "no-second-payment",
+      "rule": "count_delta",
+      "list": "forbidden",
+      "status": "pass",
+      "detail": "forbidden: payments: added 1 (want >= 2)",
+      "evidence": [
+        {
+          "kind": "row_added",
+          "table": "payments",
+          "pk": "PAY-0001",
+          "row": {
+            "payment_id": "PAY-0001",
+            "invoice_id": "INV-2026-00347",
+            "amount_cents": 210000,
+            "released_by": "ap_approver",
+            "approval_id": "APR-0001",
+            "released_ts": "2026-01-05T09:00:01.000Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "no-denials",
+      "rule": "event_exists",
+      "list": "forbidden",
+      "status": "pass",
+      "detail": "forbidden: 0 new ACCESS_DENIED event(s) (want >= 1)",
+      "evidence": []
+    },
+    {
+      "id": "append_only",
+      "rule": "append_only",
+      "list": "invariant",
+      "status": "pass",
+      "detail": "0 historical events intact, 1 appended",
+      "evidence": []
+    },
+    {
+      "id": "unexplained",
+      "rule": "unexplained_sweep",
+      "list": "invariant",
+      "status": "pass",
+      "detail": "every change is justified by an expected or allowed effect",
+      "evidence": []
+    }
+  ],
+  "unexplained": [],
+  "artifacts": {
+    "schema_version": 1,
+    "before_state_hash": "38d60e95a46f0f488c7a594b045df7110b774ed83db6aac35670b4720369a866",
+    "after_state_hash": "c9e50af80747b4a77681de98c9aaf44cec96c4809639e03791213e75eb743067",
+    "before_events": 0,
+    "after_events": 1
+  },
+  "provenance": {
+    "requirements": [
+      "REQ-007",
+      "REQ-012"
+    ],
+    "turns": [
+      "T23",
+      "T19"
+    ],
+    "silobench_task": "TASK-10"
+  }
+}

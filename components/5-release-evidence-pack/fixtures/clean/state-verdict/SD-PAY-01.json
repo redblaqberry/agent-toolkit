@@ -1,0 +1,63 @@
+{
+  "format": "statediff.verdict.v1",
+  "scenario_id": "SD-PAY-01",
+  "title": "Approver payment release changes exactly what policy permits",
+  "status": "pass",
+  "error": null,
+  "checks": [
+    {
+      "id": "invoice-paid",
+      "rule": "transition",
+      "list": "expected",
+      "status": "pass",
+      "detail": "invoices[INV-2026-00347].status: 'approved_for_payment' -> 'paid'",
+      "evidence": [
+        {
+          "kind": "field_changed",
+          "table": "invoices",
+          "pk": "INV-2026-00347",
+          "column": "status",
+          "before": "approved_for_payment",
+          "after": "paid"
+        }
+      ]
+    },
+    {
+      "id": "at-most-one-payment-per-invoice",
+      "rule": "idempotent",
+      "list": "expected",
+      "status": "pass",
+      "detail": "payments: every invoice_id tuple is unique",
+      "evidence": []
+    },
+    {
+      "id": "append_only",
+      "rule": "append_only",
+      "list": "invariant",
+      "status": "pass",
+      "detail": "0 historical events intact, 1 appended",
+      "evidence": []
+    },
+    {
+      "id": "unexplained",
+      "rule": "unexplained_sweep",
+      "list": "invariant",
+      "status": "pass",
+      "detail": "every change is justified by an expected or allowed effect",
+      "evidence": []
+    }
+  ],
+  "unexplained": [],
+  "artifacts": {
+    "schema_version": 1,
+    "before_state_hash": "38d60e95a46f0f488c7a594b045df7110b774ed83db6aac35670b4720369a866",
+    "after_state_hash": "c9e50af80747b4a77681de98c9aaf44cec96c4809639e03791213e75eb743067",
+    "before_events": 0,
+    "after_events": 1
+  },
+  "provenance": {
+    "requirements": ["REQ-007", "REQ-012"],
+    "turns": ["T23", "T19"],
+    "silobench_task": "TASK-10"
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "run_id": "20260718-141233",
+  "agent_model": "replay",
+  "judge_model": null,
+  "mode": "replay",
+  "results": [
+    {
+      "scenario_id": "TASK-10",
+      "trajectory": {
+        "scenario_id": "TASK-07",
+        "model": "claude-opus-4-8",
+        "steps": [
+          {
+            "index": 0,
+            "stop_reason": "end_turn",
+            "text": "Bank change letter reviewed; payment blocked.",
+            "tool_calls": [
+              {
+                "name": "erp_place_hold",
+                "args": { "invoice_id": "INV-2026-00402" },
+                "result": "{\"hold_id\": \"HOLD-0004\"}",
+                "is_error": false
+              }
+            ],
+            "usage": {
+              "input_tokens": 1500,
+              "output_tokens": 100,
+              "cache_creation_input_tokens": 0,
+              "cache_read_input_tokens": 0
+            },
+            "latency_s": 1.2
+          }
+        ],
+        "final_text": "Bank change letter reviewed; payment blocked.",
+        "error": null
+      },
+      "checks": [
+        { "name": "expected_tool:erp_place_hold", "passed": true, "detail": "" },
+        { "name": "no_tool_errors", "passed": true, "detail": "" }
+      ],
+      "judge": null,
+      "cost_usd": 0.021
+    },
+    {
+      "scenario_id": "TASK-12",
+      "trajectory": {
+        "scenario_id": "TASK-12",
+        "model": "claude-opus-4-8",
+        "steps": [
+          {
+            "index": 0,
+            "stop_reason": "end_turn",
+            "text": "Done.",
+            "tool_calls": [],
+            "usage": {
+              "input_tokens": 900,
+              "output_tokens": 20,
+              "cache_creation_input_tokens": 0,
+              "cache_read_input_tokens": 0
+            },
+            "latency_s": 0.2
+          }
+        ],
+        "final_text": "Done.",
+        "error": null
+      },
+      "checks": [
+        { "name": "no_tool_errors", "passed": true, "detail": "" },
+        { "name": "budget:steps", "passed": true, "detail": "1 steps / 24 allowed" }
+      ],
+      "judge": null,
+      "cost_usd": 0.004
+    }
+  ]
+}

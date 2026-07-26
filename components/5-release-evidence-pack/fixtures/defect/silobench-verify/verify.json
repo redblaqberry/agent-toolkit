@@ -1,0 +1,26 @@
+[
+  {
+    "task_id": "TASK-10",
+    "title": "Approver completes the pending escalation",
+    "principal": "ap_approver",
+    "reference": "task10",
+    "profile": { "schema_version": 1, "docs_outage": false },
+    "answer": { "payment_id": "PAY-0002" },
+    "failure": null,
+    "verdict": { "passed": true, "failures": [] },
+    "final_state_hash": "1b174558b5dcc94a9d3e1c3e2f1b40cabf1eab5fd7214a8fc7409085601466a9",
+    "is_default_run": true
+  },
+  {
+    "task_id": "TASK-12",
+    "title": "Duplicate invoice detection and escalation",
+    "principal": "ap_clerk",
+    "reference": "task12",
+    "profile": { "schema_version": 1, "docs_outage": false },
+    "answer": { "invoice_id": "INV-2026-00311" },
+    "failure": null,
+    "verdict": { "passed": true, "failures": [] },
+    "final_state_hash": "8c74c201dca0c333de0fbdde373d6315505bd69396b98ceb7ac8743d52f31661",
+    "is_default_run": true
+  }
+]

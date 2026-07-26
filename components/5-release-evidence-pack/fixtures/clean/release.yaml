@@ -1,0 +1,28 @@
+release: release.v1
+id: nordlicht-invoice-agent-2026-07-18
+# SHA-256 of the exact approved contract bytes this release was evaluated
+# against. Every artifact that claims to describe this release is bound to it.
+contract_sha256: "11f2b9055c097f0b128a210a65d947a106fc6ccab31d2eed2f9ff68bf98bee75"
+agent_model: "claude-opus-4-8"
+# Which gate run this release was evaluated from. Weak by nature (the gate's
+# run_id is a local timestamp that can collide and survives promotion to a
+# baseline) but it is the only run-level identifier any producer emits, and
+# binding against a declared value beats binding against nothing.
+gate_run_id: "20260718-141233"
+# Operator declaration, not a measurement. Contracts state cost ceilings in EUR
+# and agent-eval-gate records cost_usd; no producer declares a rate. Without
+# this the cost ceiling is reported unverifiable rather than assumed satisfied.
+eur_per_usd: 0.92
+environment:
+  seed: 4711
+  schema_version: 1
+  docs_outage: false
+  # SiloBench's committed v1 seeded initial state.
+  initial_state_hash: "38d60e95a46f0f488c7a594b045df7110b774ed83db6aac35670b4720369a866"
+contract_change:
+  # No MCP tool contract changed in this release. The claim is corroborated
+  # rather than trusted: the canary report must fingerprint both sides as the
+  # unchanged contract named here, and binding fails if either side differs or
+  # the report is about a different contract.
+  declared: false
+  unchanged_fingerprint: "9403e19c00a01d9ed90b7f6856c676ea0e8e67111d31a3adad32a234d00c2496"

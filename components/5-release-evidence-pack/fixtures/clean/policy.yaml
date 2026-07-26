@@ -1,0 +1,89 @@
+policy: release-policy.v1
+id: nordlicht-invoice-agent-ga
+
+# Every entry needs an explicit `reduce`. Omitting it is a validation error
+# rather than a silent default, because "several artifacts of this kind
+# disagree" must have a defined answer before it happens, not after.
+required_evidence:
+  - kind: contract
+    min_count: 1
+    reduce: all
+    # Presence only. Verifying the approver's own attestation would need their
+    # public key as a pack input, which v0.1 does not take.
+    must: [signature_present]
+
+  - kind: gate-run
+    min_count: 1
+    reduce: worst
+    # Coverage is measured against what the traceability map declares, so a
+    # single passing artifact cannot satisfy the class while the scenarios the
+    # release depends on have no evidence at all.
+    must_cover: traceability_scenarios
+
+  - kind: state-verdict
+    min_count: 1
+    reduce: worst
+    must_cover: traceability_statediff_scenarios
+
+  - kind: blast-radius
+    min_count: 1
+    reduce: worst
+
+  - kind: environment-golden
+    min_count: 1
+    reduce: all
+
+  - kind: silobench-verify
+    min_count: 1
+    reduce: worst
+    # Every SiloBench task the traceability map declares must appear in the
+    # verify output. Without this, dropping a declared task lets its golden
+    # comparison silently disappear while the class still clears on the tasks
+    # that remain.
+    must_cover: traceability_scenarios
+
+rules:
+  - id: R-001
+    kind: requirement_coverage
+    title: Every contract requirement is exercised by declared evidence
+    blocking: true
+
+  - id: R-002
+    kind: assertion_density
+    title: No scenario scores as passing while asserting nothing
+    min_behavioral_checks: 1
+    blocking: true
+
+  - id: R-003
+    kind: slo
+    title: Agreed latency and cost ceilings hold
+    blocking: true
+
+  - id: R-004
+    kind: state_verdict
+    title: No world-state verdict fails
+    blocking: true
+
+  - id: R-005
+    kind: contract_change
+    title: No breaking or risky MCP contract change reaches release
+    max_severity: info
+    blocking: true
+
+  - id: R-006
+    kind: regression
+    title: Cost per invoice did not regress against the previous release
+    metric: cost_per_invoice_eur
+    direction: at_most
+    tolerance_pct: 0
+    blocking: false
+
+  - id: R-007
+    kind: release_binding
+    title: Every artifact describes this release
+    blocking: true
+
+  - id: R-008
+    kind: traceability_conflict
+    title: Producers agree on which requirement each task exercises
+    blocking: true
