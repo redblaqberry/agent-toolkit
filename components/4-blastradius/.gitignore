@@ -1,0 +1,18 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# captured states and reports written by runs
+captures/
+reports/
+*.snapshot.json
+.coverage
+htmlcov/
+.env
+*.db
+.idea/
+.vscode/

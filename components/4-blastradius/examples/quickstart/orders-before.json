@@ -1,0 +1,15 @@
+{
+  "format": "blastradius.snapshot.v1",
+  "schema": {
+    "name": "orders",
+    "primary_keys": {"orders": "order_id"},
+    "columns": {"orders": ["order_id", "status", "total_cents"]},
+    "event_types": ["ORDER_PLACED", "ORDER_SHIPPED"]
+  },
+  "tables": {
+    "orders": [
+      {"order_id": "O-1", "status": "placed", "total_cents": 4200}
+    ]
+  },
+  "events": []
+}

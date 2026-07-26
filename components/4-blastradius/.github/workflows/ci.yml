@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: test (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.10", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e ".[dev]"
+      # -p no:randomly is not needed; what matters is that nothing skips. A
+      # skipped test here means a capture or an optional dependency went
+      # missing, which is exactly the failure this suite exists to notice.
+      - run: pytest -q -rs --strict-markers
+      - name: No test may skip
+        shell: bash
+        run: |
+          pytest -q 2>&1 | tee result.txt
+          if grep -qE "[0-9]+ skipped" result.txt; then
+            echo "a test skipped; every capture and dependency ships with the repo"
+            exit 1
+          fi
+      - run: blast --help
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install build
+      - run: python -m build
+      - name: Wheel install smoke test
+        run: |
+          python -m venv smoke-env
+          smoke-env/bin/pip install "$(ls dist/*.whl)[cli]"
+          smoke-env/bin/blast --help
