@@ -1,0 +1,130 @@
+{
+  "contract_version": "deployment-contract.v2",
+  "metadata": {
+    "project": "fixture-approved-open-conflict",
+    "system": "supplier-invoice agent",
+    "customer": "Nordlicht GmbH",
+    "transcript": "transcript.md",
+    "transcript_sha256": null,
+    "status": "approved",
+    "approved_by": "Somebody In A Hurry",
+    "approved_at": "2026-07-16"
+  },
+  "requirements": [
+    {
+      "id": "REQ-001",
+      "title": "Autonomous posting",
+      "statement": "The agent posts invoices without human approval.",
+      "category": "allowed_action",
+      "stakeholder": "Operations",
+      "source_turns": [
+        13
+      ],
+      "followup_note": null,
+      "status": "conflict",
+      "conflicts_with": [
+        "REQ-002"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "REQ-002",
+      "title": "Human approval required",
+      "statement": "No system writes without a named human approval.",
+      "category": "security",
+      "stakeholder": "Security",
+      "source_turns": [
+        15
+      ],
+      "followup_note": null,
+      "status": "conflict",
+      "conflicts_with": [
+        "REQ-001"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "REQ-003",
+      "title": "Latency",
+      "statement": "p95 under 2 seconds.",
+      "category": "latency",
+      "stakeholder": "IT",
+      "source_turns": [
+        30
+      ],
+      "followup_note": null,
+      "status": "resolved",
+      "conflicts_with": [],
+      "resolution": null
+    },
+    {
+      "id": "REQ-004",
+      "title": "Cost ceiling",
+      "statement": "EUR 0.08 per invoice.",
+      "category": "cost",
+      "stakeholder": "Finance",
+      "source_turns": [
+        28
+      ],
+      "followup_note": null,
+      "status": "resolved",
+      "conflicts_with": [],
+      "resolution": null
+    },
+    {
+      "id": "REQ-005",
+      "title": "Staging environment",
+      "statement": "Seeded staging, seed 4711.",
+      "category": "environment",
+      "stakeholder": "IT",
+      "source_turns": [
+        39
+      ],
+      "followup_note": null,
+      "status": "resolved",
+      "conflicts_with": [],
+      "resolution": null
+    },
+    {
+      "id": "REQ-006",
+      "title": "Data governance",
+      "statement": "Customer owns data, 90 day retention, EU region.",
+      "category": "data",
+      "stakeholder": "Legal",
+      "source_turns": [],
+      "followup_note": "Recorded post-call answer from Legal.",
+      "status": "resolved",
+      "conflicts_with": [],
+      "resolution": null
+    }
+  ],
+  "open_questions": [],
+  "kpis": [],
+  "roles": [],
+  "allowed_actions": [],
+  "escalation_rules": [],
+  "security_constraints": [],
+  "slo": {
+    "p95_latency_ms": {
+      "value": 2000,
+      "requirement_id": "REQ-003"
+    },
+    "cost_per_task_eur": {
+      "value": 0.08,
+      "unit": "invoice",
+      "requirement_id": "REQ-004"
+    }
+  },
+  "environment": {
+    "name": "staging",
+    "seed": 4711,
+    "requirement_id": "REQ-005"
+  },
+  "data_governance": {
+    "owner": "Nordlicht GmbH",
+    "retention_days": 90,
+    "region": "EU",
+    "requirement_id": "REQ-006"
+  },
+  "acceptance_rules": []
+}

@@ -1,0 +1,28 @@
+{
+  "schema_version": "brand.v1",
+  "identity": {
+    "company": "Nordlicht GmbH",
+    "product_line": "Finance Automation"
+  },
+  "palette": {
+    "paper": "#ffffff",
+    "ink": "#14213d",
+    "muted_ink": "#4a5568",
+    "accent": "#1d4e89",
+    "pass_background": "#e8f1ea",
+    "pass_ink": "#1e5637",
+    "fail_background": "#fdecea",
+    "fail_ink": "#8c2318"
+  },
+  "typography": {
+    "display_stack": ["Georgia", "serif"],
+    "body_stack": ["Arial", "Helvetica", "sans-serif"],
+    "mono_stack": ["Courier New", "monospace"]
+  },
+  "policy": {
+    "max_corner_radius_px": 0,
+    "allow_shadows": false,
+    "allow_gradients": false,
+    "allow_emoji": false
+  }
+}

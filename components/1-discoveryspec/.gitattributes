@@ -1,0 +1,7 @@
+# The bundled transcript is hash-pinned by every contract's
+# metadata.transcript_sha256, and contract files are content-hashed into run
+# reports. A line-ending conversion on checkout changes those bytes, so the
+# pipeline would refuse its own example on a machine whose git normalizes text.
+# Nothing under these paths may ever be converted.
+examples/** -text
+tests/fixtures/** -text

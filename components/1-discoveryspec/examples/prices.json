@@ -1,0 +1,6 @@
+{
+  "claude-sonnet-5": {
+    "input_per_mtok": 2.75,
+    "output_per_mtok": 13.75
+  }
+}

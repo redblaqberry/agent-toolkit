@@ -1,0 +1,56 @@
+{
+  "contract_version": "deployment-contract.v2",
+  "metadata": {
+    "project": "fixture-duplicate-ids",
+    "system": "supplier-invoice agent",
+    "customer": "Nordlicht GmbH",
+    "transcript": "transcript.md",
+    "transcript_sha256": null,
+    "status": "draft",
+    "approved_by": null,
+    "approved_at": null
+  },
+  "requirements": [
+    {
+      "id": "REQ-001",
+      "title": "First requirement",
+      "statement": "First statement.",
+      "category": "kpi",
+      "stakeholder": "Operations",
+      "source_turns": [
+        7
+      ],
+      "followup_note": null,
+      "status": "resolved",
+      "conflicts_with": [],
+      "resolution": null
+    },
+    {
+      "id": "REQ-001",
+      "title": "Second requirement reusing the same id",
+      "statement": "Second statement.",
+      "category": "security",
+      "stakeholder": "Security",
+      "source_turns": [
+        19
+      ],
+      "followup_note": null,
+      "status": "resolved",
+      "conflicts_with": [],
+      "resolution": null
+    }
+  ],
+  "open_questions": [],
+  "kpis": [],
+  "roles": [],
+  "allowed_actions": [],
+  "escalation_rules": [],
+  "security_constraints": [],
+  "slo": {
+    "p95_latency_ms": null,
+    "cost_per_task_eur": null
+  },
+  "environment": null,
+  "data_governance": null,
+  "acceptance_rules": []
+}

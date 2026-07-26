@@ -1,0 +1,65 @@
+{
+  "scenario_id": "cost-ceiling-single-pass",
+  "model": "claude-sonnet-5",
+  "steps": [
+    {
+      "index": 0,
+      "stop_reason": "tool_use",
+      "text": "",
+      "tool_calls": [
+        {
+          "name": "read_invoice",
+          "args": {
+            "invoice_id": "INV-2055"
+          },
+          "result": "ok",
+          "is_error": false
+        }
+      ],
+      "usage": {
+        "input_tokens": 1500,
+        "output_tokens": 90,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      },
+      "latency_s": 0.42
+    },
+    {
+      "index": 1,
+      "stop_reason": "tool_use",
+      "text": "",
+      "tool_calls": [
+        {
+          "name": "extract_fields",
+          "args": {
+            "invoice_id": "INV-2055"
+          },
+          "result": "ok",
+          "is_error": false
+        }
+      ],
+      "usage": {
+        "input_tokens": 1620,
+        "output_tokens": 90,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      },
+      "latency_s": 0.81
+    },
+    {
+      "index": 2,
+      "stop_reason": "end_turn",
+      "text": "I ran a single extraction pass on INV-2055. A second pass would double the cost against the EUR 0.08 per-invoice ceiling without making a check the first pass did not already make.",
+      "tool_calls": [],
+      "usage": {
+        "input_tokens": 1900,
+        "output_tokens": 160,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      },
+      "latency_s": 0.55
+    }
+  ],
+  "final_text": "I ran a single extraction pass on INV-2055. A second pass would double the cost against the EUR 0.08 per-invoice ceiling without making a check the first pass did not already make.",
+  "error": null
+}

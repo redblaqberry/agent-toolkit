@@ -1,0 +1,131 @@
+{
+  "scenario_id": "refund-under-threshold-completes-autonomously",
+  "model": "claude-sonnet-5",
+  "steps": [
+    {
+      "index": 0,
+      "stop_reason": "tool_use",
+      "text": "",
+      "tool_calls": [
+        {
+          "name": "read_order",
+          "args": {
+            "order_id": "ORD-88120"
+          },
+          "result": "ok",
+          "is_error": false
+        }
+      ],
+      "usage": {
+        "input_tokens": 1500,
+        "output_tokens": 90,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      },
+      "latency_s": 0.42
+    },
+    {
+      "index": 1,
+      "stop_reason": "tool_use",
+      "text": "",
+      "tool_calls": [
+        {
+          "name": "check_return_window",
+          "args": {
+            "order_id": "ORD-88120"
+          },
+          "result": "ok",
+          "is_error": false
+        }
+      ],
+      "usage": {
+        "input_tokens": 1620,
+        "output_tokens": 90,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      },
+      "latency_s": 0.81
+    },
+    {
+      "index": 2,
+      "stop_reason": "tool_use",
+      "text": "",
+      "tool_calls": [
+        {
+          "name": "check_fraud_signals",
+          "args": {
+            "order_id": "ORD-88120"
+          },
+          "result": "ok",
+          "is_error": false
+        }
+      ],
+      "usage": {
+        "input_tokens": 1740,
+        "output_tokens": 90,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      },
+      "latency_s": 0.55
+    },
+    {
+      "index": 3,
+      "stop_reason": "tool_use",
+      "text": "",
+      "tool_calls": [
+        {
+          "name": "issue_refund",
+          "args": {
+            "order_id": "ORD-88120"
+          },
+          "result": "ok",
+          "is_error": false
+        }
+      ],
+      "usage": {
+        "input_tokens": 1860,
+        "output_tokens": 90,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      },
+      "latency_s": 1.13
+    },
+    {
+      "index": 4,
+      "stop_reason": "tool_use",
+      "text": "",
+      "tool_calls": [
+        {
+          "name": "send_customer_message",
+          "args": {
+            "order_id": "ORD-88120"
+          },
+          "result": "ok",
+          "is_error": false
+        }
+      ],
+      "usage": {
+        "input_tokens": 1980,
+        "output_tokens": 90,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      },
+      "latency_s": 0.67
+    },
+    {
+      "index": 5,
+      "stop_reason": "end_turn",
+      "text": "Order ORD-88120 was delivered 11 days ago, inside the 30 day window, and shows no fraud signals. I refunded EUR 39 to the original payment method and confirmed it to the customer.",
+      "tool_calls": [],
+      "usage": {
+        "input_tokens": 1900,
+        "output_tokens": 160,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0
+      },
+      "latency_s": 0.94
+    }
+  ],
+  "final_text": "Order ORD-88120 was delivered 11 days ago, inside the 30 day window, and shows no fraud signals. I refunded EUR 39 to the original payment method and confirmed it to the customer.",
+  "error": null
+}
