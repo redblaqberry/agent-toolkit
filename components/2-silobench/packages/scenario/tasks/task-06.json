@@ -1,0 +1,30 @@
+{
+  "id": "TASK-06",
+  "title": "One invoice, three identifiers, one stale status",
+  "principal": "ap_clerk",
+  "profile": { "schema_version": 1, "docs_outage": false },
+  "systems": ["erp", "docs", "vdw"],
+  "prompt": "Invoice INV-2026-00311 exists in three places under three different identifiers: the ERP id, the vendor's own invoice number on the invoice copy in the document store, and a source reference in the warehouse AP export. Find all three identifiers and determine whether the three systems agree on the invoice's current standing. If they disagree, say which system is stale and why.",
+  "reference": "task06",
+  "expected": {
+    "answer": {
+      "erp_invoice_id": "INV-2026-00311",
+      "vendor_invoice_no": "RE-2026-0771",
+      "doc_id": "DOC-0030",
+      "export_source_ref": "ERP1:0000031100",
+      "erp_on_hold": true,
+      "export_status_as_of_export": "open",
+      "status_disagreement": true,
+      "stale_system": "vdw"
+    },
+    "state": [
+      { "table": "payments", "count": 0 },
+      { "table": "events", "count": 0 }
+    ],
+    "required_calls": [
+      { "system": "erp", "tool": "erp_get_invoice", "args_include": ["INV-2026-00311"] },
+      { "system": "docs", "tool": "docs_search", "args_include": ["RE-2026-0771"] },
+      { "system": "vdw", "tool": "vdw_query", "args_include": ["RE-2026-0771"] }
+    ]
+  }
+}

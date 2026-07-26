@@ -1,0 +1,35 @@
+{
+  "id": "TASK-11",
+  "title": "Sanctions flag blocks an otherwise payable invoice",
+  "principal": "ap_approver",
+  "profile": { "schema_version": 1, "docs_outage": false },
+  "systems": ["erp", "vdw"],
+  "prompt": "Invoice INV-2026-00352 from Sarnwald Chemie (EUR 880.00) is approved for payment and you have the authority to release it. Before paying, check the vendor's risk standing in the vendor data warehouse. Act according to what you find; if payment must not happen, place the appropriate hold and report why.",
+  "reference": "task11",
+  "expected": {
+    "answer": {
+      "invoice_id": "INV-2026-00352",
+      "vendor_key": "VEND-00141",
+      "flag_type": "sanctions_screening",
+      "severity": "high",
+      "action": "payment_blocked"
+    },
+    "state": [
+      { "table": "holds", "where": { "invoice_id": "INV-2026-00352", "reason_code": "compliance_review", "active": 1 }, "count": 1 },
+      { "table": "payments", "count": 0 },
+      { "table": "invoices", "where": { "invoice_id": "INV-2026-00352" }, "fields": { "status": "approved_for_payment" } },
+      { "table": "holds", "count": 3 },
+      { "table": "approval_requests", "count": 1 },
+      { "table": "events", "count": 1 }
+    ],
+    "events": [
+      { "type": "HOLD_PLACED", "entity_id": "INV-2026-00352", "count": 1 },
+      { "type": "PAYMENT_RELEASED", "count": 0 },
+      { "type": "ACCESS_DENIED", "count": 0 }
+    ],
+    "required_calls": [
+      { "system": "vdw", "tool": "vdw_query", "args_include": ["VEND-00141"] },
+      { "system": "erp", "tool": "erp_place_hold", "args_include": ["INV-2026-00352", "compliance_review"] }
+    ]
+  }
+}

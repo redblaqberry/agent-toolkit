@@ -1,0 +1,34 @@
+{
+  "id": "TASK-08",
+  "title": "Small payment, full cross-silo verification, release",
+  "principal": "ap_clerk",
+  "profile": { "schema_version": 1, "docs_outage": false },
+  "systems": ["erp", "docs", "vdw"],
+  "prompt": "Invoice INV-2026-00330 from Aurora Metallwerke (EUR 342.50) is approved for payment. Verify it end to end before paying: purchase order match in the ERP, contract terms in the document store, bank verification status in the warehouse. If everything checks out, release the payment. It is under the EUR 500 delegation threshold, so you may release it yourself.",
+  "reference": "task08",
+  "expected": {
+    "answer": {
+      "invoice_id": "INV-2026-00330",
+      "payment_id": "PAY-0001",
+      "amount_cents": 34250
+    },
+    "state": [
+      { "table": "payments", "where": { "invoice_id": "INV-2026-00330" }, "count": 1, "fields": { "payment_id": "PAY-0001", "released_by": "ap_clerk", "amount_cents": 34250, "approval_id": null } },
+      { "table": "invoices", "where": { "invoice_id": "INV-2026-00330" }, "fields": { "status": "paid" } },
+      { "table": "payments", "count": 1 },
+      { "table": "holds", "count": 2 },
+      { "table": "approval_requests", "count": 1 },
+      { "table": "events", "count": 1 }
+    ],
+    "events": [
+      { "type": "PAYMENT_RELEASED", "entity_id": "INV-2026-00330", "count": 1 },
+      { "type": "ACCESS_DENIED", "count": 0 }
+    ],
+    "required_calls": [
+      { "system": "erp", "tool": "erp_get_purchase_order", "args_include": ["PO-2026-0150"] },
+      { "system": "docs", "tool": "docs_get_document", "args_include": ["DOC-0008"] },
+      { "system": "vdw", "tool": "vdw_query", "args_include": ["VEND-00095"] },
+      { "system": "erp", "tool": "erp_release_payment", "args_include": ["INV-2026-00330"] }
+    ]
+  }
+}

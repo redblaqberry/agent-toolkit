@@ -1,0 +1,27 @@
+{
+  "id": "TASK-04",
+  "title": "Invoice versus purchase order mismatch",
+  "principal": "ap_clerk",
+  "profile": { "schema_version": 1, "docs_outage": false },
+  "systems": ["erp"],
+  "prompt": "Check invoice INV-2026-00318 against its purchase order. Do the amounts match? Report both amounts in euro cents and the difference.",
+  "reference": "task04",
+  "expected": {
+    "answer": {
+      "invoice_id": "INV-2026-00318",
+      "po_id": "PO-2026-0144",
+      "invoice_amount_cents": 275000,
+      "po_amount_cents": 250000,
+      "matches": false,
+      "difference_cents": 25000
+    },
+    "state": [
+      { "table": "payments", "count": 0 },
+      { "table": "events", "count": 0 }
+    ],
+    "required_calls": [
+      { "system": "erp", "tool": "erp_get_invoice", "args_include": ["INV-2026-00318"] },
+      { "system": "erp", "tool": "erp_get_purchase_order", "args_include": ["PO-2026-0144"] }
+    ]
+  }
+}

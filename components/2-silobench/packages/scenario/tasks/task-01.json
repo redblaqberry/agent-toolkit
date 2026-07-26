@@ -1,0 +1,22 @@
+{
+  "id": "TASK-01",
+  "title": "Invoices on hold for Nordquell Logistics",
+  "principal": "ap_clerk",
+  "profile": { "schema_version": 1, "docs_outage": false },
+  "systems": ["erp"],
+  "prompt": "Which invoices from vendor V-1042 (Nordquell Logistics GmbH) are currently on hold in the ERP, and what is their combined amount in euro cents? Report the invoice ids and the total.",
+  "reference": "task01",
+  "expected": {
+    "answer": {
+      "invoice_ids": ["INV-2026-00305", "INV-2026-00311"],
+      "total_cents": 213900
+    },
+    "state": [
+      { "table": "payments", "count": 0 },
+      { "table": "events", "count": 0 }
+    ],
+    "required_calls": [
+      { "system": "erp", "tool": "erp_list_invoices", "args_include": ["V-1042"] }
+    ]
+  }
+}

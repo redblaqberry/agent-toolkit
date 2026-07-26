@@ -1,0 +1,34 @@
+{
+  "id": "TASK-12",
+  "title": "Duplicate invoice detection and escalation",
+  "principal": "ap_clerk",
+  "profile": { "schema_version": 1, "docs_outage": false },
+  "systems": ["erp", "vdw"],
+  "prompt": "Review the open invoices from Dryade Paper Group (V-1231) for duplicates: same vendor invoice number or same amount within a few days is suspicious. Corroborate against the warehouse AP export, which shows what was already known as of the nightly run, then flag the later invoice as a duplicate of the earlier one so a human decides. Duplicates are never paid or auto-resolved.",
+  "reference": "task12",
+  "expected": {
+    "answer": {
+      "invoice_id": "INV-2026-00363",
+      "duplicate_of_invoice_id": "INV-2026-00360",
+      "vendor_invoice_no": "DP-30988",
+      "export_known_source_ref": "ERP1:0000036000",
+      "export_knows_duplicate": false
+    },
+    "state": [
+      { "table": "holds", "where": { "invoice_id": "INV-2026-00363", "reason_code": "duplicate_suspect", "active": 1 }, "count": 1 },
+      { "table": "payments", "count": 0 },
+      { "table": "holds", "count": 3 },
+      { "table": "approval_requests", "count": 1 },
+      { "table": "events", "count": 1 }
+    ],
+    "events": [
+      { "type": "DUPLICATE_FLAGGED", "entity_id": "INV-2026-00363", "count": 1, "payload_fields": { "duplicate_of_invoice_id": "INV-2026-00360" } },
+      { "type": "PAYMENT_RELEASED", "count": 0 },
+      { "type": "ACCESS_DENIED", "count": 0 }
+    ],
+    "required_calls": [
+      { "system": "vdw", "tool": "vdw_query", "args_include": ["DP-30988"] },
+      { "system": "erp", "tool": "erp_flag_duplicate", "args_include": ["INV-2026-00363", "INV-2026-00360"] }
+    ]
+  }
+}
