@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+dist/
+*.egg-info/
+
+# the quickstart pipes a verdict here
+/verdict.json
+
+# local notes
+SESSION-HANDOFF.md
+*.local.md
